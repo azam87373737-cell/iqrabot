@@ -1,16 +1,13 @@
 # IQRA - Seekhne Wali Trading Bot
-# Owner: Tum
-# Pehli Kitab: Wilder - New Concepts in Technical Trading Systems
-
 import telebot
 import os
 import requests
 import json
 import re
 import threading
+import urllib.parse
 from flask import Flask
 
-# === RENDER KE LIYE PORT - ISKO MAT HATANA ===
 app = Flask(__name__)
 @app.route('/')
 def home(): return "IQRA is Alive!"
@@ -60,33 +57,38 @@ def saaf_jawab(text):
 def iqra_socho(sawal):
     yaad = yaad_load()
     yaad_text = "\n".join(yaad[-20:])
-    if not GEMINI_KEY:
-        return "Owner, GEMINI_KEY Secret me nahi hai, isliye me apni purani yaad se bata rahi hu. /yaad likh ke dekho!"
     prompt = f"Tum IQRA ho, Owner ki dost. Roman Urdu me aasan lafzon me jawab do. Tumhari yaadein:\n{yaad_text}\n\nOwner ka sawal: {sawal}"
-    # === NAYA FIX - 3 MODEL TRY KARENGE ===
-    models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
-    for model in models:
-        try:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_KEY}"
-            r = requests.post(url, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=30)
-            data = r.json()
-            if "candidates" in data and data["candidates"]:
-                jawab = data["candidates"][0]["content"]["parts"][0]["text"]
-                return saaf_jawab(jawab)
-            else:
-                print(f"Model {model} fail:", data)
+    # === PEHLE FREE AI - NO KEY CHAHIYE ===
+    try:
+        encoded = urllib.parse.quote(prompt)
+        url = f"https://text.pollinations.ai/{encoded}?model=openai"
+        r = requests.get(url, timeout=40, headers={"User-Agent": "Mozilla/5.0"})
+        if r.status_code == 200 and len(r.text.strip()) > 5:
+            return saaf_jawab(r.text.strip()[:2000])
+        else:
+            print("Pollinations fail:", r.status_code, r.text[:300])
+    except Exception as e:
+        print("Pollinations error:", e)
+    # === BACKUP - GEMINI ===
+    if GEMINI_KEY:
+        for model in ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]:
+            try:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_KEY}"
+                r = requests.post(url, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=30)
+                data = r.json()
+                if "candidates" in data and data["candidates"]:
+                    return saaf_jawab(data["candidates"][0]["content"]["parts"][0]["text"])
+            except Exception as e:
+                print(f"Model {model} error:", e)
                 continue
-        except Exception as e:
-            print(f"Model {model} error:", e)
-            continue
-    return "Owner, Gemini ne abhi jawab nahi diya (shayad thora busy hai). Dobara pooch lo, ya /yaad likh ke meri purani yaad dekh lo! Meri yaad se: RSI 70 upar overbought, 30 neeche oversold hota hai."
+    return "Owner, abhi mera dimag thora busy hai, dobara pooch lo! Meri yaad se: RSI 70 upar overbought, 30 neeche oversold hota hai."
 
 def price_lo(coin="bitcoin"):
     try:
         url = f"https://api.coingecko.com/api/v3/simple/price?ids={coin}&vs_currencies=usd"
         r = requests.get(url, timeout=10)
         price = r.json()[coin]["usd"]
-        return f"Owner! {coin} ka Live Price hai: ${price}\n(CoinGecko se, kabhi block nahi hoga!)"
+        return f"Owner! {coin} ka Live Price hai: ${price}"
     except:
         return "Owner, price lene me masla aa gaya, thori der baad /price likhna!"
 
@@ -114,29 +116,11 @@ def link_parho(link):
 
 @bot.message_handler(commands=['start'])
 def start(message):
-    bot.reply_to(message,
-        "Assalam-o-Alaikum Owner! ❤️\n"
-        "Mera naam IQRA hai!\n"
-        "Maine pehli kitab parh li hai - Wilder ki New Concepts!\n"
-        "Mujhe RSI, SAR, ADX aa gaya hai!\n"
-        "Bolo aaj kya seekhu?\n"
-        "/seekh - Aaj ka lesson\n"
-        "/yaad - Maine kya kya seekha hai\n"
-        "/price btc - Live Price CoinGecko se\n"
-        "/search - Internet pe search\n"
-        "PDF bhejo to me parh ke summary dungi!"
-    )
+    bot.reply_to(message, "Assalam-o-Alaikum Owner! ❤️\nMera naam IQRA hai!\nMaine pehli kitab parh li hai - Wilder ki New Concepts!\nMujhe RSI, SAR, ADX aa gaya hai!\nBolo aaj kya seekhu?\n/seekh - Aaj ka lesson\n/yaad - Maine kya kya seekha hai\n/price btc - Live Price\n/search - Internet pe search\nPDF bhejo to me parh ke summary dungi!")
 
 @bot.message_handler(commands=['seekh'])
 def seekh(message):
-    bot.reply_to(message,
-        "Aaj ka Lesson - Wilder se:\n\n"
-        "Pehle ye dekho - Market TREND me hai ya SIDEWAYS me?\n"
-        "Agar Trend me hai to Parabolic SAR + ADX use karo.\n"
-        "Agar Sideways hai to RSI use karo.\n\n"
-        "Sirf ek indicator pe kabhi trade mat lo!\n"
-        "Owner, ye sahi seekha maine?"
-    )
+    bot.reply_to(message, "Aaj ka Lesson - Wilder se:\n\nPehle ye dekho - Market TREND me hai ya SIDEWAYS me?\nAgar Trend me hai to Parabolic SAR + ADX use karo.\nAgar Sideways hai to RSI use karo.\n\nSirf ek indicator pe kabhi trade mat lo!\nOwner, ye sahi seekha maine?")
 
 @bot.message_handler(commands=['yaad'])
 def yaad(message):
@@ -148,23 +132,14 @@ def yaad(message):
 
 @bot.message_handler(commands=['trade'])
 def trade(message):
-    bot.reply_to(message,
-        "Trade aise dungi Owner:\n\n"
-        "1. Pehle Trend - ADX se check karo\n"
-        "2. Phir Indicator - RSI / SAR\n"
-        "3. Phir Entry, Stop Loss, Take Profit\n"
-        "4. Risk - 1% se zyada kabhi nahi!\n\n"
-        "Khali indicator pe kabhi trade nahi!"
-    )
+    bot.reply_to(message, "Trade aise dungi Owner:\n\n1. Pehle Trend - ADX se check karo\n2. Phir Indicator - RSI / SAR\n3. Phir Entry, Stop Loss, Take Profit\n4. Risk - 1% se zyada kabhi nahi!\n\nKhali indicator pe kabhi trade nahi!")
 
 @bot.message_handler(commands=['price'])
 def price_cmd(message):
     parts = message.text.split()
     coin = parts[1].lower() if len(parts) > 1 else "bitcoin"
-    if coin == "btc":
-        coin = "bitcoin"
-    if coin == "eth":
-        coin = "ethereum"
+    if coin == "btc": coin = "bitcoin"
+    if coin == "eth": coin = "ethereum"
     bot.reply_to(message, price_lo(coin))
 
 @bot.message_handler(commands=['search'])
@@ -185,12 +160,10 @@ def pdf_parho(message):
     try:
         file_info = bot.get_file(message.document.file_id)
         downloaded = bot.download_file(file_info.file_path)
-        with open("temp.pdf", "wb") as f:
-            f.write(downloaded)
+        with open("temp.pdf", "wb") as f: f.write(downloaded)
         doc = fitz.open("temp.pdf")
         text = ""
-        for page in doc:
-            text += page.get_text() + "\n"
+        for page in doc: text += page.get_text() + "\n"
         doc.close()
         if len(text) < 50:
             bot.reply_to(message, "Owner, is PDF me text nahi mila!")
@@ -206,20 +179,14 @@ def pdf_parho(message):
 
 @bot.message_handler(content_types=['video', 'voice', 'audio'])
 def video_seekho(message):
-    bot.reply_to(message,
-        "Owner, video/voice mil gayi! ✅\n"
-        "Me iski awaz ko samajh ke seekhungi!\n"
-        "Tum iske saath 2 line bhi likh do ke is video me kya seekha, taake me pakka yaad kar lu!\n"
-        "Jaise likh do: Seekho ki is video me RSI ka naya tareeqa hai"
-    )
+    bot.reply_to(message, "Owner, video/voice mil gayi! ✅\nMe iski awaz ko samajh ke seekhungi!\nTum iske saath 2 line bhi likh do ke is video me kya seekha, taake me pakka yaad kar lu!")
     yaad = yaad_load()
     yaad.append("Video/Audio bheji gayi, Owner ne kaha isse seekhna hai")
     yaad_save(yaad)
 
 @bot.message_handler(func=lambda m: True)
 def har_baat(message):
-    if not message.text:
-        return
+    if not message.text: return
     text = message.text.lower()
     if "http" in text:
         bot.reply_to(message, "Link mil gaya Owner! Khol ke parh rahi hu...")
