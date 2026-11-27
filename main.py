@@ -5,7 +5,6 @@ import requests
 import json
 import re
 import threading
-import urllib.parse
 from flask import Flask
 
 app = Flask(__name__)
@@ -58,15 +57,20 @@ def iqra_socho(sawal):
     yaad = yaad_load()
     yaad_text = "\n".join(yaad[-20:])
     prompt = f"Tum IQRA ho, Owner ki dost. Roman Urdu me aasan lafzon me jawab do. Tumhari yaadein:\n{yaad_text}\n\nOwner ka sawal: {sawal}"
-    # === PEHLE FREE AI - NO KEY CHAHIYE ===
+    # === FREE AI - POST WALA TAREEQA - NO KEY ===
     try:
-        encoded = urllib.parse.quote(prompt)
-        url = f"https://text.pollinations.ai/{encoded}?model=openai"
-        r = requests.get(url, timeout=40, headers={"User-Agent": "Mozilla/5.0"})
-        if r.status_code == 200 and len(r.text.strip()) > 5:
-            return saaf_jawab(r.text.strip()[:2000])
-        else:
-            print("Pollinations fail:", r.status_code, r.text[:300])
+        r = requests.post(
+            "https://text.pollinations.ai/openai",
+            json={"messages": [{"role": "user", "content": prompt}], "model": "openai"},
+            timeout=40,
+            headers={"Content-Type": "application/json"}
+        )
+        print("Pollinations status:", r.status_code)
+        if r.status_code == 200:
+            data = r.json()
+            jawab = data["choices"][0]["message"]["content"]
+            if jawab and len(jawab.strip()) > 5:
+                return saaf_jawab(jawab.strip()[:2000])
     except Exception as e:
         print("Pollinations error:", e)
     # === BACKUP - GEMINI ===
