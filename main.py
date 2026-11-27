@@ -22,6 +22,7 @@ except:
 
 TOKEN = os.environ.get("BOT_TOKEN")
 GEMINI_KEY = os.environ.get("GEMINI_KEY")
+GROQ_KEY = os.environ.get("GROQ_KEY")
 bot = telebot.TeleBot(TOKEN)
 
 IQRA_MEMORY = [
@@ -57,25 +58,28 @@ def iqra_socho(sawal):
     yaad = yaad_load()
     yaad_text = "\n".join(yaad[-20:])
     prompt = f"Tum IQRA ho, Owner ki dost. Roman Urdu me aasan lafzon me jawab do. Tumhari yaadein:\n{yaad_text}\n\nOwner ka sawal: {sawal}"
-    # === FREE AI - POST WALA TAREEQA - NO KEY ===
-    try:
-        r = requests.post(
-            "https://text.pollinations.ai/openai",
-            json={"messages": [{"role": "user", "content": prompt}], "model": "openai"},
-            timeout=40,
-            headers={"Content-Type": "application/json"}
-        )
-        print("Pollinations status:", r.status_code)
-        if r.status_code == 200:
-            data = r.json()
-            jawab = data["choices"][0]["message"]["content"]
-            if jawab and len(jawab.strip()) > 5:
-                return saaf_jawab(jawab.strip()[:2000])
-    except Exception as e:
-        print("Pollinations error:", e)
-    # === BACKUP - GEMINI ===
+    # === 1. GROQ - SAB SE TEZ, PAKKA CHALEGA ===
+    if GROQ_KEY:
+        try:
+            r = requests.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                json={"messages": [{"role": "user", "content": prompt}], "model": "llama-3.3-70b-versatile", "temperature": 0.7},
+                headers={"Authorization": f"Bearer {GROQ_KEY}", "Content-Type": "application/json"},
+                timeout=30
+            )
+            print("Groq status:", r.status_code)
+            if r.status_code == 200:
+                data = r.json()
+                jawab = data["choices"][0]["message"]["content"]
+                if jawab and len(jawab.strip()) > 5:
+                    return saaf_jawab(jawab.strip()[:2000])
+            else:
+                print("Groq fail:", r.text[:500])
+        except Exception as e:
+            print("Groq error:", e)
+    # === 2. GEMINI BACKUP ===
     if GEMINI_KEY:
-        for model in ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]:
+        for model in ["gemini-2.5-flash", "gemini-2.0-flash"]:
             try:
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_KEY}"
                 r = requests.post(url, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=30)
