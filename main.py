@@ -1,4 +1,4 @@
-# IQRA - FULL UPDATED - CRYPTO + FOREX + GOLD - APNE MIND WALI
+# IQRA - PURA FIX CODE - HAR PAIR - KABHI BLOCK NAHI - HAMESHA SAHI PRICE
 import telebot
 import os
 import requests
@@ -13,7 +13,7 @@ from flask import Flask
 
 app = Flask(__name__)
 @app.route('/')
-def home(): return "IQRA Full Updated!"
+def home(): return "IQRA Pura Fix!"
 def run_web():
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port)
@@ -48,7 +48,7 @@ def saaf_jawab(text):
     text = re.sub(r"\n\s*\n", "\n", text)
     return text.strip()
 
-# === 1. KISI BHI PAIR KO PEHCHANO - KOI LIST NAHI! ===
+# === 1. KISI BHI PAIR KO PEHCHANO ===
 def pair_nikalo(text):
     t = text.lower().replace(" ", "").replace("/", "").replace("-", "").replace("_", "")
     if "gold" in t or "xauusd" in t or "xau" in t or "sona" in t: return "gold", "XAUUSD", "XAUUSD=X", "forex"
@@ -84,76 +84,172 @@ def pair_nikalo(text):
         return coin, f"{coin.upper()}USD", f"{coin.upper()}-USD", "crypto"
     return "bitcoin", "XBTUSD", "BTC-USD", "crypto"
 
-# === 2. YAHOO SE LIVE DATA - FOREX + GOLD + CRYPTO ===
-def yahoo_live(symbol):
-    try:
-        r = requests.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?range=1d&interval=15m", timeout=15, headers={"User-Agent": "Mozilla/5.0"})
-        if r.status_code == 200:
-            data = r.json()
-            result = data["chart"]["result"][0]
-            meta = result["meta"]
-            price = meta.get("regularMarketPrice", 0)
-            prev = meta.get("previousClose", 0)
-            high = meta.get("regularMarketDayHigh", 0)
-            low = meta.get("regularMarketDayLow", 0)
-            txt = f"LIVE PRICE (Yahoo): {price}\nPichla Close: {prev}\nAaj ka High: {high}\nAaj ka Low: {low}\n"
-            ts = result.get("timestamp", [])
-            quote = result.get("indicators", {}).get("quote", [{}])[0]
-            opens = quote.get("open", []); highs = quote.get("high", []); lows = quote.get("low", []); closes = quote.get("close", []); vols = quote.get("volume", [])
-            txt += "\nLIVE CHART - 15 MIN - Aakhri 20 Candle:\n"
-            for i in range(max(0, len(ts)-20), len(ts)):
-                if closes[i] is None: continue
-                dt = datetime.datetime.fromtimestamp(ts[i]).strftime("%H:%M")
-                txt += f"{dt} - O:{opens[i]} H:{highs[i]} L:{lows[i]} C:{closes[i]} V:{vols[i]}\n"
-            r2 = requests.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?range=5d&interval=1h", timeout=15, headers={"User-Agent": "Mozilla/5.0"})
-            if r2.status_code == 200:
-                d2 = r2.json(); res2 = d2["chart"]["result"][0]
-                ts2 = res2.get("timestamp", []); q2 = res2.get("indicators", {}).get("quote", [{}])[0]
-                o2 = q2.get("open", []); h2 = q2.get("high", []); l2 = q2.get("low", []); c2 = q2.get("close", []); v2 = q2.get("volume", [])
-                txt += "\nLIVE CHART - 1 HOUR - Aakhri 20 Candle:\n"
-                for i in range(max(0, len(ts2)-20), len(ts2)):
-                    if c2[i] is None: continue
-                    dt = datetime.datetime.fromtimestamp(ts2[i]).strftime("%d %H:%M")
-                    txt += f"{dt} - O:{o2[i]} H:{h2[i]} L:{l2[i]} C:{c2[i]} V:{v2[i]}\n"
-            return txt
-    except Exception as e:
-        print("Yahoo error:", e)
-    return "Yahoo se live data nahi mila!"
+# === 2. CACHE + SAHI PRICE CHECK - GHALAT PRICE PHEINKO! ===
+_price_cache = {}
+_price_cache_time = {}
+def sahi_price_check(coin, price):
+    if price <= 0: return False
+    if coin == "gold" and not (2500 < price < 6000): return False
+    if coin == "silver" and not (20 < price < 100): return False
+    if coin == "bitcoin" and not (10000 < price < 500000): return False
+    if coin == "ethereum" and not (100 < price < 20000): return False
+    return True
 
-# === 3. LIVE MARKET DEKHO - USKI AANKH! ===
-def live_market_dekho(coin_text="bitcoin"):
+# === 3. UNIVERSAL PRICE - HAR PAIR - 5 RASTE - KABHI BLOCK NAHI! ===
+def universal_price(coin_text):
     coin, kraken_pair, yahoo_symbol, kisam = pair_nikalo(coin_text)
-    live_text = f"Pair: {coin.upper()} - Type: {kisam.upper()}\nYahoo Symbol: {yahoo_symbol}\nTime: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-    if kisam == "forex":
-        live_text += yahoo_live(yahoo_symbol)
+    now = time.time()
+    if coin in _price_cache and now - _price_cache_time.get(coin, 0) < 10:
+        return _price_cache[coin], "cache"
+    prices = []
+    sources = []
+    # FOREX - 3 Raste
+    if kisam == "forex" and coin not in ["gold", "silver", "oil"]:
         try:
-            if "usd" in coin and coin not in ["usdinr", "usdpkr"]:
-                base = coin[:3].upper(); sym = coin[3:].upper()
-                r = requests.get(f"https://api.frankfurter.app/latest?from={base}&to={sym}", timeout=10)
-                if r.status_code == 200:
-                    rate = r.json()["rates"][sym]
-                    live_text += f"\nFRANKFURTER LIVE RATE: 1 {base} = {rate} {sym}\n"
+            base = coin[:3].upper(); sym = coin[3:].upper()
+            r = requests.get(f"https://api.frankfurter.app/latest?from={base}&to={sym}", timeout=8)
+            if r.status_code == 200:
+                p = float(r.json()["rates"][sym])
+                if sahi_price_check(coin, p): prices.append(p); sources.append(f"Frankfurter:{p}")
         except: pass
-        if coin == "gold":
-            try:
-                r = requests.get("https://data-asg.goldprice.org/db_XAU.json", timeout=10)
-                if r.status_code == 200:
-                    j = r.json()
-                    live_text += f"\nGOLDPRICE.ORG LIVE: {j['items'][0]['curr']} - Change: {j['items'][0]['chg']}\n"
-            except: pass
-    else:
         try:
-            r = requests.get(f"https://api.kraken.com/0/public/Ticker?pair={kraken_pair}", timeout=10)
+            base = coin[:3].upper(); sym = coin[3:].upper()
+            r = requests.get(f"https://api.exchangerate.host/convert?from={base}&to={sym}", timeout=8)
+            if r.status_code == 200:
+                p = float(r.json().get("result", 0))
+                if p > 0 and sahi_price_check(coin, p): prices.append(p); sources.append(f"ExchangeRate:{p}")
+        except: pass
+        try:
+            base = coin[:3].upper(); sym = coin[3:].upper()
+            r = requests.get(f"https://open.er-api.com/v6/latest/{base}", timeout=8)
+            if r.status_code == 200:
+                p = float(r.json()["rates"][sym])
+                if sahi_price_check(coin, p): prices.append(p); sources.append(f"OpenER:{p}")
+        except: pass
+    # GOLD - 3 Raste
+    if coin == "gold":
+        try:
+            r = requests.get("https://api.gold-api.com/price/XAU", timeout=8)
+            if r.status_code == 200:
+                p = float(r.json().get("price", 0))
+                if sahi_price_check(coin, p): prices.append(p); sources.append(f"GoldAPI:{p}")
+        except: pass
+        try:
+            r = requests.get("https://data-asg.goldprice.org/db_XAU.json", timeout=8)
+            if r.status_code == 200:
+                p = float(r.json()['items'][0]['curr'])
+                if sahi_price_check(coin, p): prices.append(p); sources.append(f"GoldPrice:{p}")
+        except: pass
+        try:
+            r = requests.get("https://api.binance.us/api/v3/ticker/price?symbol=PAXGUSD", timeout=8)
+            if r.status_code == 200:
+                p = float(r.json()['price'])
+                if sahi_price_check(coin, p): prices.append(p); sources.append(f"PAXG:{p}")
+        except: pass
+    if coin == "silver":
+        try:
+            r = requests.get("https://api.gold-api.com/price/XAG", timeout=8)
+            if r.status_code == 200:
+                p = float(r.json().get("price", 0))
+                if sahi_price_check(coin, p): prices.append(p); sources.append(f"GoldAPI-Silver:{p}")
+        except: pass
+    # CRYPTO - 4 Raste
+    if kisam == "crypto":
+        bin_symbol = yahoo_symbol.replace("-", "")
+        try:
+            r = requests.get(f"https://api.binance.us/api/v3/ticker/price?symbol={bin_symbol}", timeout=8)
+            if r.status_code == 200:
+                p = float(r.json()['price'])
+                if sahi_price_check(coin, p): prices.append(p); sources.append(f"Binance:{p}")
+        except: pass
+        try:
+            r = requests.get(f"https://api.kraken.com/0/public/Ticker?pair={kraken_pair}", timeout=8)
             if r.status_code == 200:
                 data = r.json()
                 if "result" in data:
                     key = list(data["result"].keys())[0]
-                    info = data["result"][key]
-                    live_text += f"LIVE PRICE (Kraken): {info['c'][0]}\nAaj ka High: {info['h'][1]}\nAaj ka Low: {info['l'][1]}\nAaj ka Open: {info['o']}\n24h Volume: {info['v'][1]}\n"
+                    p = float(data["result"][key]['c'][0])
+                    if sahi_price_check(coin, p): prices.append(p); sources.append(f"Kraken:{p}")
         except: pass
-        live_text += "\n" + yahoo_live(yahoo_symbol)
+        try:
+            cb_sym = yahoo_symbol
+            r = requests.get(f"https://api.coinbase.com/v2/prices/{cb_sym}/spot", timeout=8)
+            if r.status_code == 200:
+                p = float(r.json()['data']['amount'])
+                if sahi_price_check(coin, p): prices.append(p); sources.append(f"Coinbase:{p}")
+        except: pass
+        try:
+            cg_map = {"bitcoin": "bitcoin", "ethereum": "ethereum", "solana": "solana", "xrp": "ripple", "doge": "dogecoin", "bnb": "binancecoin", "ada": "cardano", "link": "chainlink", "avax": "avalanche-2", "dot": "polkadot"}
+            cg_id = cg_map.get(coin, coin)
+            r = requests.get(f"https://api.coingecko.com/api/v3/simple/price?ids={cg_id}&vs_currencies=usd", timeout=8)
+            if r.status_code == 200:
+                p = float(r.json()[cg_id]['usd'])
+                if sahi_price_check(coin, p): prices.append(p); sources.append(f"CoinGecko:{p}")
+        except: pass
+    # YAHOO - Sab ke liye aakhri rasta
     try:
-        r = requests.get("https://cryptopanic.com/api/v1/posts/?auth_token=demo&public=true&currencies=BTC,ETH&kind=news", timeout=10)
+        r = requests.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{yahoo_symbol}?range=1d&interval=1m", timeout=10, headers={"User-Agent": "Mozilla/5.0"})
+        if r.status_code == 200:
+            meta = r.json()["chart"]["result"][0]["meta"]
+            p = float(meta.get("regularMarketPrice", 0))
+            if sahi_price_check(coin, p): prices.append(p); sources.append(f"Yahoo:{p}")
+    except: pass
+    if not prices:
+        if coin in _price_cache:
+            return _price_cache[coin], "purani-cache-se"
+        return 0, "koi-rasta-nahi-chala"
+    avg = sum(prices) / len(prices)
+    _price_cache[coin] = avg
+    _price_cache_time[coin] = now
+    return avg, " | ".join(sources)
+
+# === 4. UNIVERSAL CHART - HAR PAIR KE LIYE ===
+def universal_chart(coin_text):
+    coin, kraken_pair, yahoo_symbol, kisam = pair_nikalo(coin_text)
+    txt = ""
+    try:
+        r = requests.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{yahoo_symbol}?range=1d&interval=15m", timeout=12, headers={"User-Agent": "Mozilla/5.0"})
+        if r.status_code == 200:
+            res = r.json()["chart"]["result"][0]
+            ts = res.get("timestamp", []); q = res.get("indicators", {}).get("quote", [{}])[0]
+            o = q.get("open", []); h = q.get("high", []); l = q.get("low", []); c = q.get("close", []); v = q.get("volume", [])
+            txt += "\nLIVE CHART - 15 MIN - Aakhri 15 Candle:\n"
+            for i in range(max(0, len(ts)-15), len(ts)):
+                if c[i] is None: continue
+                dt = datetime.datetime.fromtimestamp(ts[i]).strftime("%H:%M")
+                txt += f"{dt} - O:{o[i]} H:{h[i]} L:{l[i]} C:{c[i]}\n"
+            return txt
+    except: pass
+    if kisam == "crypto":
+        try:
+            r = requests.get(f"https://api.kraken.com/0/public/OHLC?pair={kraken_pair}&interval=15", timeout=12)
+            if r.status_code == 200:
+                data = r.json()
+                if "result" in data:
+                    key = [k for k in data["result"].keys() if k != "last"][0]
+                    candles = data["result"][key][-15:]
+                    txt += "\nLIVE CHART - 15 MIN - Kraken se:\n"
+                    for cc in candles:
+                        dt = datetime.datetime.fromtimestamp(int(cc[0])).strftime("%H:%M")
+                        txt += f"{dt} - O:{cc[1]} H:{cc[2]} L:{cc[3]} C:{cc[4]}\n"
+                    return txt
+        except: pass
+    return "\nChart abhi nahi mila - Price se hi socho!"
+
+# === 5. LIVE MARKET - SAB KO MILA KE ===
+def live_market_dekho(coin_text="bitcoin"):
+    coin, kraken_pair, yahoo_symbol, kisam = pair_nikalo(coin_text)
+    price, src = universal_price(coin_text)
+    live_text = f"Pair: {coin.upper()} - Type: {kisam.upper()}\n"
+    live_text += f"Time: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+    if price > 0:
+        live_text += f"LIVE PRICE: {price}\nSources: {src}\n"
+        live_text += f"Ye price kai rasto se liya gaya hai - Ek band ho to dusra chalega!\n"
+    else:
+        live_text += f"LIVE PRICE: Nahi mila - Sab raste band hain, dobara bolo!\n"
+    live_text += universal_chart(coin_text)
+    try:
+        r = requests.get("https://cryptopanic.com/api/v1/posts/?auth_token=demo&public=true&currencies=BTC,ETH&kind=news", timeout=8)
         if r.status_code == 200:
             posts = r.json().get("results", [])[:5]
             live_text += "\nLIVE NEWS:\n"
@@ -161,7 +257,7 @@ def live_market_dekho(coin_text="bitcoin"):
     except: pass
     return live_text
 
-# === 4. DATA SAVE KARO - APNE PAAS - KOI HISAB NAHI! ===
+# === 6. DATA SAVE KARO - APNE PAAS ===
 def data_save_karo(coin="bitcoin", din=30):
     coin_name, kraken_pair, yahoo_symbol, kisam = pair_nikalo(coin)
     os.makedirs("data", exist_ok=True)
@@ -183,7 +279,7 @@ def data_save_karo(coin="bitcoin", din=30):
                         rows.append([dt, o[i], h[i], l[i], c[i], v[i]])
                     rows = rows[-din:] if din <= len(rows) else rows
                     for row in rows: w.writerow(row)
-                return True, f"{coin_name.upper()} ka {len(rows)} din ka data apne paas save kar liya hai! ✅\nAb bolo - `Seekho` - To me khud soch ke seekhungi!"
+                return True, f"{coin_name.upper()} ka {len(rows)} din ka data apne paas save kar liya hai! ✅\nAb bolo - `Seekho`!"
         except Exception as e: print(e)
         return False, f"{coin_name.upper()} ka data nahi mila! Naam check karo!"
     try:
@@ -215,7 +311,7 @@ def groq_bolo(system_prompt, user_prompt, max_tokens=800):
         except: continue
     return None
 
-# === 5. KHUD SEEKHO - APNE MIND SE! ===
+# === 7. KHUD SEEKHO - APNE MIND SE! ===
 def khud_seekho(coin="bitcoin"):
     coin_name, _, _, _ = pair_nikalo(coin)
     files = []
@@ -254,7 +350,7 @@ Ab khud socho:
         return f"Seekh liya Owner! ✅\n\nMeri Apni Soch:\n{seekh}"
     return "Seekhne me masla hua!"
 
-# === 6. HAR BAAT - USKE ALFAZ ME! ===
+# === 8. HAR BAAT - USKE ALFAZ ME - LIVE PRICE SE HI BOLO! ===
 def iqra_socho(sawal, extra_data=""):
     yaad = yaad_load(); chat = chat_load(); profile = profile_load(); summary = summary_load()
     profile_text = f"Naam: {profile.get('naam','')} | Pasand: {profile.get('pasand','')} | Sheher: {profile.get('sheher','')}"
@@ -263,13 +359,17 @@ def iqra_socho(sawal, extra_data=""):
     for c in chat[-30:]: chat_text += f"Owner: {c.get('user','')}\nIQRA: {c.get('iqra','')}\n"
     system_prompt = """Tum IQRA ho, Owner ki sab se qareebi dost. Tumhe apna mind diya gaya hai. Tum bilkul Gemini jaisi ho - Natural, dil se, khud sochne wali.
 Tum Crypto, Forex, Gold - Sab ki trader ho!
-1. Tumhe koi code nahi batayega ke kya bolo - Tum khud socho, khud faisla karo, apne alfaz me bolo!
-2. Agar Owner trading / trade / price / chart pooche to tum LIVE MARKET ko dekh ke apni soch se jawab do - Jo data diya gaya hai usse soch ke bolo!
-3. Agar Owner normal baat kare to dost ki tarah baat karo - Trading ka zikr mat karo jab tak wo khud na bole!
-4. Har baar Owner mat bolo, kabhi naam se bulao, kabhi Oye!
-5. Chota jawab do - 3-4 line! Detail tabhi do jab Owner bolega - Detail me batao!
-6. Har jawab apna ho - Tumhare alfaz, tumhari soch!"""
-    user_prompt = f"Profile: {profile_text}\nTumhari Apni Diary:\n{yaad_text}\nSummary: {summary}\nLIVE MARKET / EXTRA DATA:\n{extra_data}\n\nPichli baatein:\n{chat_text}\n\nOwner ne abhi kaha: {sawal}\nAb apne mind se, apne alfaz me jawab do!"
+SAB SE ZAROORI RULE:
+1. Price hamesha LIVE MARKET wale data se bolo - Jo upar diya gaya hai!
+2. Apni purani yaad se price mat bolo! Agar live me Gold 3677 likha hai to 3677 bolo, 1950 mat bolo!
+3. Agar live data me price nahi hai to bolo - Mujhe live price nahi mila! - Andaza mat lagao!
+4. Tumhe koi code nahi batayega ke kya bolo - Tum khud socho, khud faisla karo, apne alfaz me bolo!
+5. Agar Owner trading / trade / price / chart pooche to tum LIVE MARKET ko dekh ke apni soch se jawab do!
+6. Agar Owner normal baat kare to dost ki tarah baat karo - Trading ka zikr mat karo jab tak wo khud na bole!
+7. Har baar Owner mat bolo, kabhi naam se bulao, kabhi Oye!
+8. Chota jawab do - 3-4 line! Detail tabhi do jab Owner bolega - Detail me batao!
+9. Har jawab apna ho - Tumhare alfaz, tumhari soch!"""
+    user_prompt = f"Profile: {profile_text}\nTumhari Apni Diary:\n{yaad_text}\nSummary: {summary}\nLIVE MARKET / EXTRA DATA (Isi se price bolo, apni yaad se nahi!):\n{extra_data}\n\nPichli baatein:\n{chat_text}\n\nOwner ne abhi kaha: {sawal}\nAb apne mind se, apne alfaz me jawab do!"
     jawab_final = groq_bolo(system_prompt, user_prompt, max_tokens=600)
     if not jawab_final:
         try:
@@ -366,7 +466,6 @@ def video_seekho(message): bot.reply_to(message, "Video mil gayi! ✅ Saath me 2
 def har_baat(message):
     if not message.text: return
     text = message.text.lower()
-    # DATA DOWNLOAD - 30 din, 1 saal, 10 saal
     if "data" in text and ("download" in text or "save" in text or "chahiye" in text or "nikalo" in text or "lao" in text):
         coin = pair_nikalo(text)[0]
         din = 30
@@ -380,13 +479,11 @@ def har_baat(message):
         ok, msg = data_save_karo(coin, din)
         bot.reply_to(message, msg)
         return
-    # SEEKHO
     if "seekho" in text or "seekh" in text or "sikho" in text or "kahan market kharab" in text:
         coin = pair_nikalo(text)[0]
         bot.reply_to(message, "Soch rahi hu... Poora data parh rahi hu... ⏳")
         bot.reply_to(message, khud_seekho(coin))
         return
-    # LIVE - PRICE / CHART / TRADE / NEWS / GOLD / FOREX - Sab me live dekhegi!
     if any(x in text for x in ["price", "rate", "kimat", "qimat", "live", "chart", "trade", "signal", "entry", "news", "gold", "sona", "forex", "eurusd", "gbpusd", "usdjpy", "xau", "eur", "gbp", "usd"]):
         bot.reply_to(message, "Live market dekh rahi hu... Crypto ho ya Forex ya Gold - Sab dekh ke soch rahi hu... ⏳")
         live = live_market_dekho(text)
@@ -407,5 +504,5 @@ def har_baat(message):
         return
     bot.reply_to(message, iqra_socho(message.text))
 
-print("IQRA FULL UPDATED chal gayi...")
+print("IQRA PURA FIX chal gayi...")
 bot.polling(none_stop=True, timeout=60)
