@@ -63,21 +63,23 @@ def iqra_socho(sawal):
     if not GEMINI_KEY:
         return "Owner, GEMINI_KEY Secret me nahi hai, isliye me apni purani yaad se bata rahi hu. /yaad likh ke dekho!"
     prompt = f"Tum IQRA ho, Owner ki dost. Roman Urdu me aasan lafzon me jawab do. Tumhari yaadein:\n{yaad_text}\n\nOwner ka sawal: {sawal}"
-    try:
-        # NAYA MODEL - 1.5 ki jagah 2.0
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_KEY}"
-        r = requests.post(url, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=30)
-        data = r.json()
-        # === YAHI ASAL FIX HAI - candidates check ===
-        if "candidates" not in data or not data["candidates"]:
-            print("Gemini Error:", data)
-            # Agar API ne block kiya to purani yaad se jawab do
-            return "Owner, Gemini ne abhi jawab nahi diya (shayad thora busy hai). Dobara pooch lo, ya /yaad likh ke meri purani yaad dekh lo! Meri yaad se: RSI 70 upar overbought, 30 neeche oversold hota hai."
-        jawab = data["candidates"][0]["content"]["parts"][0]["text"]
-        return saaf_jawab(jawab)
-    except Exception as e:
-        print("Error:", e)
-        return f"Owner, dimagh me halka sa masla aa gaya, dobara pooch lo! ({e})"
+    # === NAYA FIX - 3 MODEL TRY KARENGE ===
+    models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
+    for model in models:
+        try:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_KEY}"
+            r = requests.post(url, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=30)
+            data = r.json()
+            if "candidates" in data and data["candidates"]:
+                jawab = data["candidates"][0]["content"]["parts"][0]["text"]
+                return saaf_jawab(jawab)
+            else:
+                print(f"Model {model} fail:", data)
+                continue
+        except Exception as e:
+            print(f"Model {model} error:", e)
+            continue
+    return "Owner, Gemini ne abhi jawab nahi diya (shayad thora busy hai). Dobara pooch lo, ya /yaad likh ke meri purani yaad dekh lo! Meri yaad se: RSI 70 upar overbought, 30 neeche oversold hota hai."
 
 def price_lo(coin="bitcoin"):
     try:
