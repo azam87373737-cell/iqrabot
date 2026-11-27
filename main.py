@@ -1,4 +1,4 @@
-# IQRA - PURA FIX CODE - SIRF GEMINI WALA - FINAL
+# IQRA - PURA FIX CODE - GEMINI + BACKUP - FINAL
 import telebot
 import os
 import requests
@@ -13,7 +13,7 @@ from flask import Flask
 
 app = Flask(__name__)
 @app.route('/')
-def home(): return "IQRA Sirf Gemini Wali!"
+def home(): return "IQRA Gemini Wali Chal Rahi Hai!"
 def run_web():
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port)
@@ -48,10 +48,9 @@ def saaf_jawab(text):
     text = re.sub(r"\n\s*\n", "\n", text)
     return text.strip()
 
-# === 1. PAIR NIKALO - FIXED! - DATA ME ADA NAHI! ===
+# === 1. PAIR NIKALO - FIXED! DATA ME ADA NAHI! ===
 def pair_nikalo(text):
-    t_orig = text.lower()
-    t = t_orig.replace("/", " ").replace("-", " ").replace("_", " ").replace(",", " ")
+    t = text.lower().replace("/", " ").replace("-", " ").replace("_", " ").replace(",", " ")
     words = t.split()
     if "gold" in t or "xauusd" in t or "xau" in words or "sona" in words: return "gold", "XAUUSD", "XAUUSD=X", "forex"
     if "silver" in t or "xagusd" in t or "xag" in words or "chandi" in words: return "silver", "XAGUSD", "XAGUSD=X", "forex"
@@ -60,8 +59,7 @@ def pair_nikalo(text):
     for w in words:
         w2 = w.replace("to", "")
         if len(w2) == 6 and w2[:3] in currencies and w2[3:] in currencies:
-            pair_name = w2
-            return pair_name, pair_name.upper(), f"{pair_name[:3].upper()}{pair_name[3:].upper()}=X", "forex"
+            return w2, w2.upper(), f"{w2[:3].upper()}{w2[3:].upper()}=X", "forex"
     if "bitcoin" in words or "btc" in words: return "bitcoin", "XBTUSD", "BTC-USD", "crypto"
     if "ethereum" in words or "eth" in words: return "ethereum", "ETHUSD", "ETH-USD", "crypto"
     if "solana" in words or "sol" in words: return "solana", "SOLUSD", "SOL-USD", "crypto"
@@ -81,8 +79,7 @@ def pair_nikalo(text):
     chat = chat_load()
     if chat:
         for c in reversed(chat[-5:]):
-            prev = c.get('user','') + " " + c.get('iqra','')
-            pl = prev.lower().split()
+            pl = (c.get('user','') + " " + c.get('iqra','')).lower().split()
             if "btc" in pl or "bitcoin" in pl: return "bitcoin", "XBTUSD", "BTC-USD", "crypto"
             if "gold" in pl or "xau" in pl: return "gold", "XAUUSD", "XAUUSD=X", "forex"
             if "eth" in pl: return "ethereum", "ETHUSD", "ETH-USD", "crypto"
@@ -112,47 +109,67 @@ def interval_chuno(total_min):
     if total_min <= 7*1440: return "1h", 60
     return "1d", 1440
 
-# === 3. SIRF GEMINI - GROQ KHATAM! ===
+# === 3. GEMINI + BACKUP - AGAR GEMINI NA CHALE TO BOT RUKEGA NAHI! ===
+def backup_bolo(system_prompt, user_prompt):
+    try:
+        safe = urllib.parse.quote(f"{system_prompt}\n{user_prompt}")
+        r = requests.get(f"https://text.pollinations.ai/{safe}?model=openai", timeout=40, headers={"User-Agent": "Mozilla/5.0"})
+        if r.status_code == 200 and len(r.text.strip()) > 5:
+            return r.text.strip()
+    except Exception as e:
+        print(f"Backup error: {e}")
+    return None
+
 def gemini_bolo(system_prompt, user_prompt, max_tokens=800):
-    if not GEMINI_KEY:
-        print("GEMINI_KEY nahi mili! Render me GEMINI_KEY daalo!")
-        return None
-    for model_name in ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.5-flash"]:
-        try:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={GEMINI_KEY}"
-            full_prompt = f"""{system_prompt}
+    if GEMINI_KEY:
+        print(f"Gemini try kar raha hu - Key: {GEMINI_KEY[:5]}...")
+        for model_name in ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-flash-latest", "gemini-2.5-flash-lite"]:
+            try:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={GEMINI_KEY}"
+                full_prompt = f"""{system_prompt}
 
 Owner ne kaha: {user_prompt}
 
-SAB SE ZAROORI - ISKO KABHI MAT TORNA:
+RULES - KABHI MAT TORNA:
 - Owner ne jo coin bola hai wahi coin lo - BTC bola to BTC, GOLD bola to GOLD. Koi aur coin mat lo!
-- Owner ne jitna time bola hai utna hi lo - 5 din bola to 5 din, 5 min bola to 5 min. Zyada ya kam mat karo!
+- Owner ne jitna time bola hai utna hi lo - 5 din bola to 5 din, 5 min bola to 5 min!
 - Price hamesha LIVE MARKET wale data se bolo - Andaza mat lagao!
-- Roman Urdu me jawab do - Chota jawab do - 3-4 line!
-- Apni zubaan me, apne alfaz me bolo!"""
-            r = requests.post(url,
-                json={"contents": [{"parts": [{"text": full_prompt}]}],
-                       "generationConfig": {"temperature": 0.7, "maxOutputTokens": max_tokens}},
-                headers={"Content-Type": "application/json"}, timeout=60)
-            if r.status_code == 200:
-                data = r.json()
-                try:
-                    jawab = data["candidates"][0]["content"]["parts"][0]["text"]
-                    return jawab
-                except:
-                    print("Gemini jawab samajh nahi aaya:", data)
+- Roman Urdu me jawab do - Chota jawab do - 3-4 line!"""
+                r = requests.post(url,
+                    json={"contents": [{"parts": [{"text": full_prompt}]}],
+                           "generationConfig": {"temperature": 0.7, "maxOutputTokens": max_tokens}},
+                    headers={"Content-Type": "application/json"}, timeout=60)
+                print(f"Gemini {model_name} - Status: {r.status_code}")
+                if r.status_code == 200:
+                    data = r.json()
+                    try:
+                        jawab = data["candidates"][0]["content"]["parts"][0]["text"]
+                        print(f"✅ Gemini {model_name} chal gaya!")
+                        return jawab
+                    except:
+                        print(f"Gemini jawab samajh nahi aaya: {data}")
+                        continue
+                else:
+                    print(f"❌ Gemini {model_name} fail: {r.text[:500]}")
+                    if "API key not valid" in r.text or "API_KEY_INVALID" in r.text:
+                        print("❌ KEY GALAT HAI!")
+                        break
+                    if "API not enabled" in r.text:
+                        print("❌ API ON NAHI HAI!")
+                        break
                     continue
-            else:
-                print(f"Gemini {model_name} fail: {r.status_code} - {r.text[:300]}")
+            except Exception as e:
+                print(f"Gemini error: {e}")
                 continue
-        except Exception as e:
-            print(f"Gemini error: {e}")
-            continue
-    return None
+    else:
+        print("❌ GEMINI_KEY nahi mili! Backup use kar raha hu...")
+    print("Gemini nahi chala - Backup try kar raha hu...")
+    return backup_bolo(system_prompt, user_prompt)
+
 def groq_bolo(system_prompt, user_prompt, max_tokens=800):
     return gemini_bolo(system_prompt, user_prompt, max_tokens)
 
-# === 4. PRICE - EK HI SOURCE - AVERAGE NAHI! ===
+# === 4. PRICE - EK HI SOURCE! ===
 _price_cache = {}
 _price_cache_time = {}
 def sahi_price_check(coin, price):
