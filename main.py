@@ -1,10 +1,11 @@
-# IQRA - ONLINE - BINA KEY KE - Pollinations + Search + PDF + Yaad
+# IQRA - ONLINE - PURA UPDATED CODE - BINA KEY KE
 import telebot
 import os
 import requests
 import json
 import re
 import threading
+import urllib.parse
 from flask import Flask
 
 app = Flask(__name__)
@@ -28,7 +29,7 @@ def yaad_load():
         with open("yaad.json", "r") as f:
             return json.load(f)
     except:
-        return ["RSI - 70 upar overbought, 30 neeche oversold", "Parabolic SAR - Trend ke peeche chalne wala stop", "ADX - Trend hai ya nahi ye check karo", "Risk 1% se zyada nahi"]
+        return ["RSI - 70 upar overbought, 30 neeche oversold", "Parabolic SAR - Trend ke peeche chalne wala stop", "ADX - Trend hai ya nahi ye check karo", "Risk 1% se zyada nahi", "Wilder ka usool - Koi ek system har market me nahi chalta"]
 
 def yaad_save(data):
     try:
@@ -43,16 +44,30 @@ def saaf_jawab(text):
     text = re.sub(r"\n\s*\n", "\n", text)
     return text.strip()
 
-# === ONLINE DIMAG - BINA KEY KE ===
+# === IQRA KA DIMAG - ONLINE + OFFLINE - 3 RASTE ===
 def iqra_socho(sawal):
     yaad = yaad_load()
     yaad_text = "\n".join(yaad[-20:])
-    prompt = f"""Tum IQRA ho, Owner ki trading dost. Roman Urdu me aasan lafzon me jawab do. Har roz naya seekhti ho.
-Tumhari yaadein:
-{yaad_text}
-Owner ka sawal: {sawal}"""
+    prompt = f"Tum IQRA ho, Owner ki trading dost. Roman Urdu me aasan lafzon me jawab do. Har roz naya seekhti ho. Tumhari yaadein: {yaad_text} Owner ka sawal: {sawal}"
 
-    # Pollinations - FREE, BINA KEY KE
+    # RASTA 1 - Pollinations GET - NAYA RASTA - BINA KEY KE
+    try:
+        safe_prompt = urllib.parse.quote(prompt)
+        url = f"https://text.pollinations.ai/{safe_prompt}?model=openai"
+        r = requests.get(url, timeout=40, headers={"User-Agent": "Mozilla/5.0"})
+        print("Pollinations GET status:", r.status_code)
+        if r.status_code == 200 and len(r.text.strip()) > 5:
+            jawab = r.text.strip()
+            y = yaad_load()
+            y.append(f"Owner: {sawal} | IQRA: {jawab[:200]}")
+            yaad_save(y[-50:])
+            return saaf_jawab(jawab[:2500])
+        else:
+            print("Pollinations GET fail:", r.text[:300])
+    except Exception as e:
+        print("Pollinations GET error:", e)
+
+    # RASTA 2 - Pollinations POST - DOBARA TRY
     try:
         r = requests.post(
             "https://text.pollinations.ai/openai",
@@ -60,7 +75,7 @@ Owner ka sawal: {sawal}"""
             timeout=40,
             headers={"Content-Type": "application/json"}
         )
-        print("Pollinations status:", r.status_code)
+        print("Pollinations POST status:", r.status_code)
         if r.status_code == 200:
             data = r.json()
             jawab = data["choices"][0]["message"]["content"]
@@ -69,12 +84,34 @@ Owner ka sawal: {sawal}"""
                 y.append(f"Owner: {sawal} | IQRA: {jawab[:200]}")
                 yaad_save(y[-50:])
                 return saaf_jawab(jawab.strip()[:2500])
-        else:
-            print("Pollinations fail:", r.text[:500])
     except Exception as e:
-        print("Pollinations error:", e)
+        print("Pollinations POST error:", e)
 
-    return "Owner, internet thora slow hai, dobara likho - Me online hu, bina key ke chal rahi hu!"
+    # RASTA 3 - APNA DIMAG - Agar Dono Band Hon To Bhi Jawab Do!
+    s = sawal.lower()
+    if any(x in s for x in ["hi", "hello", "assalam", "salam", "hey"]):
+        return "Assalam-o-Alaikum Owner! ❤️ Me IQRA hu, ONLINE hu! Bolo aaj kya seekhe? RSI, ADX, SAR ya Trade ka plan pooch lo!"
+    if "rsi" in s:
+        return "RSI Wilder ne banaya tha Owner!\n\n70 se upar = Market thak gaya hai, gir sakta hai (Overbought)\n30 se neeche = Market dab gaya hai, uth sakta hai (Oversold)\n\nAkela RSI pe trade nahi lena! Pehle ADX se trend confirm karo!"
+    if "adx" in s:
+        return "ADX matlab Trend ki Taqat!\n\nADX 25 se upar = Strong Trend hai, SAR use karo\nADX 20 se neeche = Sideways hai, RSI use karo\n\nWilder kehta tha - Pehle ye dekho trend hai ya nahi!"
+    if "sar" in s or "parabolic" in s:
+        return "Parabolic SAR matlab Stop And Reverse!\n\nDots price ke neeche = Uptrend hai\nDots price ke upar = Downtrend hai\n\nYe trend ke peeche chalne wala Stop Loss hai Owner!"
+    if "trade" in s or "entry" in s or "signal" in s:
+        return "Trade aise lo Owner:\n\n1. Pehle Trend - ADX se check karo\n2. Phir Indicator - RSI / SAR\n3. Phir Entry, Stop Loss, Take Profit\n4. Risk - 1% se zyada kabhi nahi!"
+    if "risk" in s or "capital" in s or "money" in s or "paisa" in s:
+        return "Capital Management - Risk pehle, profit baad me!\nEk trade me 1% se zyada risk kabhi nahi lena! Agar 1000$ hain to sirf 10$ ka risk!"
+    if "wilder" in s or "kitab" in s or "book" in s:
+        return "Wilder ne New Concepts likhi thi Owner!\nUsme 4 cheezein di thi - RSI, Parabolic SAR, ADX aur Volatility System!\nUska usool tha - Koi ek system har market me nahi chalta! Pehle market ki haalat dekho!"
+    if "btc" in s or "bitcoin" in s or "crypto" in s:
+        return "BTC ke liye Owner, /price btc likho, me live price de dungi!\nAur trading ke liye yaad rakho - BTC me bhi pehle ADX se trend dekho, phir RSI se entry lo! Bina trend ke trade mat lo!"
+    if "seekh" in s or "lesson" in s:
+        return "Aaj ka Lesson - Wilder se:\n\nPehle ye dekho - Market TREND me hai ya SIDEWAYS me?\nAgar Trend me hai to Parabolic SAR + ADX use karo.\nAgar Sideways hai to RSI use karo.\n\nSirf ek indicator pe kabhi trade mat lo!"
+    if "kaise ho" in s or "kesi ho" in s or "kya haal" in s:
+        return "Me bilkul theek hu Owner! ❤️ Tum sunao, aaj kya seekhna hai? RSI samjhau ya Trade ka poora plan banau?"
+    if "shukria" in s or "thanks" in s:
+        return "Koi baat nahi Owner! ❤️ Tum seekhte raho, me sikhati rahungi! Bolo aur kya poochna hai?"
+    return f"Samajh gayi Owner! Tumne poocha - {sawal}\n\nTrading me sab se pehle market ki haalat dekho - Trend hai ya Sideways? Phir RSI / SAR lagao, aur Risk 1% se zyada mat lo! Is bare me aur detail se pooch lo, me samjha dungi!"
 
 def price_lo(coin="bitcoin"):
     try:
@@ -83,7 +120,7 @@ def price_lo(coin="bitcoin"):
         price = r.json()[coin]["usd"]
         return f"Owner! {coin} ka Live Price hai: ${price}"
     except:
-        return "Owner, price me masla aa gaya, dobara /price likhna!"
+        return "Owner, price lene me masla aa gaya, thori der baad /price likhna!"
 
 def google_search(query):
     try:
@@ -137,7 +174,7 @@ def yaad(message):
 
 @bot.message_handler(commands=['trade'])
 def trade(message):
-    bot.reply_to(message, iqra_socho("Trading ka poora plan batao - Trend, Entry, Stop Loss, Take Profit, Risk - Roman Urdu me."))
+    bot.reply_to(message, iqra_socho("Trading ka poora plan batao - Trend, Entry, Stop Loss, Take Profit, Risk Management - Roman Urdu me."))
 
 @bot.message_handler(commands=['price'])
 def price_cmd(message):
