@@ -1,4 +1,4 @@
-# IQRA - GROQ WALA - ASLI DIMAG - PURA UPDATED CODE
+# IQRA - GROQ WALA - PURA UPDATED CODE - MODEL FIX
 import telebot
 import os
 import requests
@@ -46,36 +46,39 @@ def saaf_jawab(text):
     text = re.sub(r"\n\s*\n", "\n", text)
     return text.strip()
 
-# === ASLI DIMAG - GROQ ===
+# === ASLI DIMAG - GROQ - 3 MODEL ===
 def iqra_socho(sawal):
     yaad = yaad_load()
     yaad_text = "\n".join(yaad[-20:])
     system_prompt = "Tum IQRA ho, Owner ki trading dost aur teacher. Roman Urdu me, aasan lafzon me, dostana lehje me jawab do. Tum Wilder ki kitab (RSI, Parabolic SAR, ADX) ki expert ho. Har jawab naya aur alag do, kabhi purana copy-paste jawab mat do. Tumhari yaadein ye hain:"
     user_prompt = f"Tumhari yaadein:\n{yaad_text}\n\nOwner ka sawal: {sawal}\n\nRoman Urdu me jawab do, 2-3 paragraph se zyada lamba mat karo."
 
-    # RASTA 1 - GROQ - ASLI DIMAG
+    # RASTA 1 - GROQ - ASLI DIMAG - 3 MODEL TRY KARO
     if GROQ_KEY:
-        try:
-            r = requests.post(
-                "https://api.groq.com/openai/v1/chat/completions",
-                json={"model": "llama-3.3-70b-versatile", "messages": [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}], "temperature": 0.8, "max_tokens": 1200},
-                headers={"Authorization": f"Bearer {GROQ_KEY}", "Content-Type": "application/json"},
-                timeout=40
-            )
-            print("GROQ status:", r.status_code)
-            if r.status_code == 200:
-                jawab = r.json()["choices"][0]["message"]["content"]
-                if jawab and len(jawab.strip()) > 5:
-                    y = yaad_load()
-                    y.append(f"Owner: {sawal} | IQRA: {jawab[:200]}")
-                    yaad_save(y[-50:])
-                    return saaf_jawab(jawab.strip()[:2500])
-            else:
-                print("GROQ fail:", r.text[:500])
-        except Exception as e:
-            print("GROQ error:", e)
+        for model_name in ["llama-3.1-8b-instant", "llama-3.3-70b-versatile", "openai/gpt-oss-120b"]:
+            try:
+                r = requests.post(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    json={"model": model_name, "messages": [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}], "temperature": 0.8, "max_tokens": 1200},
+                    headers={"Authorization": f"Bearer {GROQ_KEY}", "Content-Type": "application/json"},
+                    timeout=40
+                )
+                print(f"GROQ {model_name} status:", r.status_code)
+                if r.status_code == 200:
+                    jawab = r.json()["choices"][0]["message"]["content"]
+                    if jawab and len(jawab.strip()) > 5:
+                        y = yaad_load()
+                        y.append(f"Owner: {sawal} | IQRA: {jawab[:200]}")
+                        yaad_save(y[-50:])
+                        return saaf_jawab(jawab.strip()[:2500])
+                else:
+                    print(f"GROQ {model_name} fail:", r.text[:500])
+                    continue
+            except Exception as e:
+                print(f"GROQ {model_name} error:", e)
+                continue
     else:
-        print("GROQ_KEY nahi mili, Pollinations try kar raha hu...")
+        print("GROQ_KEY nahi mili!")
 
     # RASTA 2 - Pollinations - BACKUP
     try:
@@ -88,10 +91,10 @@ def iqra_socho(sawal):
     except Exception as e:
         print("Pollinations error:", e)
 
-    # RASTA 3 - Agar Dono Band Hon To Batado - Jhoot Mat Bolo
+    # RASTA 3 - Asli Wajah Batao
     if not GROQ_KEY:
-        return "Owner, GROQ_KEY Render me nahi lagi! Isliye me apne purane dimag se jawab de rahi hu. Render > Environment me GROQ_KEY lagao, phir me asli AI ban jaungi!"
-    return "Owner, GROQ thora slow hai, 10 second baad dobara likho!"
+        return "Owner, GROQ_KEY Render me nahi lagi! Render > Environment me GROQ_KEY lagao, phir me asli AI ban jaungi!"
+    return "Owner, GROQ abhi busy hai, 10 second baad dobara likho! Key lagi hui hai, bas GROQ ka server slow hai!"
 
 def price_lo(coin="bitcoin"):
     mapping = {"bitcoin": "BTCUSDT", "btc": "BTCUSDT", "ethereum": "ETHUSDT", "eth": "ETHUSDT", "solana": "SOLUSDT", "sol": "SOLUSDT", "xrp": "XRPUSDT", "doge": "DOGEUSDT", "bnb": "BNBUSDT"}
