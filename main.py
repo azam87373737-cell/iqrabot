@@ -1,26 +1,33 @@
 # IQRA - Seekhne Wali Trading Bot
 # Owner: Tum
 # Pehli Kitab: Wilder - New Concepts in Technical Trading Systems
-# Chalegi: GitHub Workflow / Render Se
 
 import telebot
 import os
 import requests
 import json
 import re
+import threading
+from flask import Flask
+
+# === RENDER KE LIYE PORT - ISKO MAT HATANA ===
+app = Flask(__name__)
+@app.route('/')
+def home(): return "IQRA is Alive!"
+def run_web():
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host='0.0.0.0', port=port)
+threading.Thread(target=run_web, daemon=True).start()
 
 try:
-    import fitz  # PDF parhne ke liye
+    import fitz
 except:
     fitz = None
 
-# Token GitHub Secret se aayega, yahan nahi likhna!
 TOKEN = os.environ.get("BOT_TOKEN")
 GEMINI_KEY = os.environ.get("GEMINI_KEY")
 bot = telebot.TeleBot(TOKEN)
 
-# === 1. PERMANENT YAAD - TRADING DIARY ===
-# Pehle wali yaad, ab file me save hogi taake bhoole nahi
 IQRA_MEMORY = [
     "RSI - Wilder ne banaya, 70 upar overbought, 30 neeche oversold",
     "Parabolic SAR - Stop And Reverse, trend ke peeche chalne wala stop",
@@ -33,8 +40,7 @@ IQRA_MEMORY = [
 def yaad_load():
     try:
         with open("yaad.json", "r") as f:
-            data = json.load(f)
-            return data
+            return json.load(f)
     except:
         return IQRA_MEMORY.copy()
 
@@ -45,9 +51,7 @@ def yaad_save(data):
     except:
         pass
 
-# === 4. SOCH BAND - MUNH PE TAPE ===
 def saaf_jawab(text):
-    # Agar Gemini ne apni soch bhej di to usko kaat do
     text = re.sub(r"\*.*?\*", "", text, flags=re.DOTALL)
     text = re.sub(r"(Soch:|Thinking:|Name:|Role:|Option.*)", "", text)
     text = re.sub(r"\n\s*\n", "\n", text)
@@ -60,14 +64,21 @@ def iqra_socho(sawal):
         return "Owner, GEMINI_KEY Secret me nahi hai, isliye me apni purani yaad se bata rahi hu. /yaad likh ke dekho!"
     prompt = f"Tum IQRA ho, Owner ki dost. Roman Urdu me aasan lafzon me jawab do. Tumhari yaadein:\n{yaad_text}\n\nOwner ka sawal: {sawal}"
     try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_KEY}"
+        # NAYA MODEL - 1.5 ki jagah 2.0
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_KEY}"
         r = requests.post(url, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=30)
-        jawab = r.json()["candidates"][0]["content"]["parts"][0]["text"]
+        data = r.json()
+        # === YAHI ASAL FIX HAI - candidates check ===
+        if "candidates" not in data or not data["candidates"]:
+            print("Gemini Error:", data)
+            # Agar API ne block kiya to purani yaad se jawab do
+            return "Owner, Gemini ne abhi jawab nahi diya (shayad thora busy hai). Dobara pooch lo, ya /yaad likh ke meri purani yaad dekh lo! Meri yaad se: RSI 70 upar overbought, 30 neeche oversold hota hai."
+        jawab = data["candidates"][0]["content"]["parts"][0]["text"]
         return saaf_jawab(jawab)
     except Exception as e:
-        return f"Owner, dimagh me masla aa gaya: {e}"
+        print("Error:", e)
+        return f"Owner, dimagh me halka sa masla aa gaya, dobara pooch lo! ({e})"
 
-# === 2. COINGECKO - BINANCE KO BYE BYE ===
 def price_lo(coin="bitcoin"):
     try:
         url = f"https://api.coingecko.com/api/v3/simple/price?ids={coin}&vs_currencies=usd"
@@ -77,7 +88,6 @@ def price_lo(coin="bitcoin"):
     except:
         return "Owner, price lene me masla aa gaya, thori der baad /price likhna!"
 
-# === 5. INTERNET - SEARCH + LINK + PDF ===
 def google_search(query):
     try:
         url = f"https://api.duckduckgo.com/?q={query}&format=json&no_html=1"
@@ -164,7 +174,6 @@ def search_cmd(message):
     bot.reply_to(message, "Internet pe dhond rahi hu Owner, ruko...")
     bot.reply_to(message, google_search(query))
 
-# === 5. PDF DOWNLOAD + READ ===
 @bot.message_handler(content_types=['document'])
 def pdf_parho(message):
     if not message.document.file_name.lower().endswith('.pdf'):
@@ -193,7 +202,6 @@ def pdf_parho(message):
     except Exception as e:
         bot.reply_to(message, f"PDF me masla: {e}")
 
-# === 3. VIDEO SE SEEKHNA - AWAZ WALA ===
 @bot.message_handler(content_types=['video', 'voice', 'audio'])
 def video_seekho(message):
     bot.reply_to(message,
@@ -208,13 +216,13 @@ def video_seekho(message):
 
 @bot.message_handler(func=lambda m: True)
 def har_baat(message):
+    if not message.text:
+        return
     text = message.text.lower()
-    # Link aaya to khol do
     if "http" in text:
         bot.reply_to(message, "Link mil gaya Owner! Khol ke parh rahi hu...")
         bot.reply_to(message, link_parho(message.text))
         return
-    # Seekho wala hukum - Permanent yaad me likh do
     if "seekho" in text or "yaad karo" in text:
         yaad = yaad_load()
         yaad.append(message.text)
@@ -229,4 +237,4 @@ def har_baat(message):
         bot.reply_to(message, iqra_socho(message.text))
 
 print("IQRA chal gayi hai...")
-bot.polling()
+bot.polling(none_stop=True, timeout=60)
