@@ -1,4 +1,4 @@
-# IQRA - PURA FIX CODE - SIRF GEMINI-2.5-FLASH WALA - FINAL
+# IQRA - PURA FIX CODE - GEMINI-2.5-FLASH - BOT CONNECT FIX!
 import telebot
 import os
 import requests
@@ -11,11 +11,17 @@ import datetime
 import csv
 from flask import Flask
 
+print("=== IQRA START HO RAHI HAI... ===")
+print(f"BOT_TOKEN hai? {'HAAN' if os.environ.get('BOT_TOKEN') else 'NAHI - TOKEN NAHI MILA!'}")
+print(f"GEMINI_KEY hai? {'HAAN' if os.environ.get('GEMINI_KEY') else 'NAHI - GEMINI KEY NAHI MILI!'}")
+print(f"OWNER_ID hai? {'HAAN' if os.environ.get('OWNER_CHAT_ID') else 'NAHI!'}")
+
 app = Flask(__name__)
 @app.route('/')
-def home(): return "IQRA Gemini 2.5 Flash Wali!"
+def home(): return "IQRA Gemini 2.5 Flash Wali - LIVE!"
 def run_web():
     port = int(os.environ.get("PORT", 10000))
+    print(f"Flask chal gaya - Port {port} pe!")
     app.run(host='0.0.0.0', port=port)
 threading.Thread(target=run_web, daemon=True).start()
 try: import fitz
@@ -109,12 +115,11 @@ def interval_chuno(total_min):
     if total_min <= 7*1440: return "1h", 60
     return "1d", 1440
 
-# === 3. MIND - SIRF GEMINI-2.5-FLASH - KOI DUSRA NAHI! ===
+# === 3. MIND - SIRF GEMINI-2.5-FLASH! ===
 def gemini_bolo(system_prompt, user_prompt, max_tokens=800):
     if not GEMINI_KEY:
-        print("❌ GEMINI_KEY nahi mili! Render me GEMINI_KEY daalo!")
+        print("❌ GEMINI_KEY nahi mili!")
         return None
-    # SIRF EK MODEL - JO TUMNE CHUNA HAI - gemini-2.5-flash
     model_name = "gemini-2.5-flash"
     try:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={GEMINI_KEY}"
@@ -143,15 +148,10 @@ RULES - KABHI MAT TORNA:
                 return None
         else:
             print(f"❌ Gemini fail: {r.text[:600]}")
-            # Yahi batayega kya ghalti hai - Logs me dekho!
             if "API key not valid" in r.text or "API_KEY_INVALID" in r.text:
-                print("❌ KEY GALAT HAI! aistudio.google.com se nayi key banao - Naye Project me!")
-            if "API not enabled" in r.text:
-                print("❌ API ON NAHI HAI! Naye Project me key banao!")
-            if "Quota exceeded" in r.text or "429" in str(r.status_code):
+                print("❌ KEY GALAT HAI!")
+            if "Quota exceeded" in r.text:
                 print("⚠️ Quota khatam - 1 minute ruk ke dobara bolo!")
-            if "404" in str(r.status_code):
-                print("❌ Model nahi mila - Lekin tumne sahi model chuna hai - gemini-2.5-flash!")
             return None
     except Exception as e:
         print(f"Gemini error: {e}")
@@ -417,7 +417,7 @@ def khud_seekho(coin_text="bitcoin", total_min=43200, label="30din"):
         yaad.append(f"MERI APNI YAAD {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')} - {coin.upper()}: {seekh}")
         yaad_save(yaad)
         return f"Seekh liya Owner! ✅ Apni Diary Me Likh Liya - Kabhi Nahi Bhulungi!\n\nMeri Apni Yaad:\n{seekh}"
-    return "Seekhne me masla hua! GEMINI_KEY check karo - Logs me dekho kya likha hai!"
+    return "Seekhne me masla hua! GEMINI_KEY check karo - Logs me dekho!"
 
 # === 8. HAR BAAT! ===
 def iqra_socho(sawal, extra_data=""):
@@ -522,6 +522,7 @@ def video_seekho(message): bot.reply_to(message, "Video mil gayi! ✅ Saath me 2
 @bot.message_handler(func=lambda m: True)
 def har_baat(message):
     if not message.text: return
+    print(f"MSG AAYA: {message.text[:100]} - From: {message.chat.id}")
     text = message.text.lower()
     if "data" in text and ("download" in text or "save" in text or "chahiye" in text or "nikalo" in text or "lao" in text or "dekho" in text or "dekhna" in text or "pehle" in text):
         if "behave" in text or "kaisa" in text or "kesa" in text or "seekho" in text or "seekh" in text or "sikho" in text:
@@ -574,5 +575,17 @@ def har_baat(message):
         return
     bot.reply_to(message, iqra_socho(message.text))
 
-print("IQRA Gemini 2.5 Flash Wali chal gayi...")
+# === AAKHRI - BOT START - PURANA CONNECTION KHATAM KAR KE! ===
+print("=== BOT TELEGRAM SE CONNECT HO RAHA HAI... ===")
+try:
+    bot.delete_webhook(drop_pending_updates=True)
+    print("✅ Purana webhook delete kar diya!")
+except Exception as e:
+    print(f"Webhook delete me masla (koi baat nahi): {e}")
+try:
+    me = bot.get_me()
+    print(f"✅ Bot mil gaya! Naam: {me.first_name} - Username: @{me.username}")
+except Exception as e:
+    print(f"❌ BOT_TOKEN GALAT HAI! Bot nahi mila! Error: {e}")
+print("=== IQRA Gemini 2.5 Flash Wali chal gayi - Polling start... ===")
 bot.polling(none_stop=True, timeout=60)
