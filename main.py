@@ -7,17 +7,13 @@ def run_web(): app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 10000)))
 threading.Thread(target=run_web, daemon=True).start()
 try: import fitz
 except: fitz = None
-
-# ===== FIX - TOKEN ME SPACE HO TO KHUD SAAF HO JAYE =====
 TOKEN = os.environ.get("BOT_TOKEN", "").strip().replace(" ", "").replace("\n", "").replace("\r", "").replace('"', "").replace("'", "")
 GROQ_KEY = os.environ.get("GROQ_KEY", "").strip().replace(" ", "").replace("\n", "").replace("\r", "").replace('"', "").replace("'", "")
-print(f"TOKEN LEN: {len(TOKEN)} SPACE: {' ' in TOKEN}")
-print(f"GROQ LEN: {len(GROQ_KEY)}")
-if not TOKEN or " " in TOKEN or ":" not in TOKEN:
-    print("TOKEN GALAT HAI - RENDER ME SAHI KARO")
+print(f"TOKEN LEN: {len(TOKEN)} GROQ LEN: {len(GROQ_KEY)}", flush=True)
+if not TOKEN or ":" not in TOKEN:
+    print("TOKEN GALAT", flush=True)
     raise SystemExit("TOKEN GALAT")
 bot = telebot.TeleBot(TOKEN)
-
 def load(n, d):
     try:
         with open(n) as f: return json.load(f)
@@ -28,16 +24,21 @@ def save(n, d):
     except: pass
 
 def mind(system, user, max_tokens=1000):
-    if not GROQ_KEY: return None
-    for model in ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"]:
+    if not GROQ_KEY:
+        print("GROQ_KEY NAHI HAI", flush=True)
+        return "GROQ_KEY NAHI HAI"
+    for model in ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]:
         try:
             r = requests.post("https://api.groq.com/openai/v1/chat/completions",
                 json={"model": model, "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}], "temperature": 0.9, "max_tokens": max_tokens},
                 headers={"Authorization": f"Bearer {GROQ_KEY.strip()}", "Content-Type": "application/json"}, timeout=60)
+            print(f"GROQ {model} {r.status_code} {r.text[:300]}", flush=True)
             if r.status_code == 200: return r.json()["choices"][0]["message"]["content"]
-            if "Invalid API Key" in r.text: break
-        except: pass
-    return None
+            if "Invalid API Key" in r.text: return "GROQ KEY GALAT HAI"
+        except Exception as e:
+            print(f"GROQ ERR {e}", flush=True)
+            continue
+    return "GROQ SE JAWAB NAHI AAYA"
 
 def net_search(sawal):
     try:
@@ -99,13 +100,6 @@ def live_market(text):
                 dt = datetime.datetime.fromtimestamp(int(k[0])/1000).strftime("%d %H:%M")
                 out += f"{dt} O:{k[1]} H:{k[2]} L:{k[3]} C:{k[4]}\n"
     except: pass
-    try:
-        r = requests.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{yahoo}?range=5d&interval=1d", timeout=10, headers={"User-Agent": "Mozilla/5.0"})
-        if r.status_code == 200:
-            res = r.json()["chart"]["result"][0]
-            c = res.get("indicators", {}).get("quote", [{}])[0].get("close", [])
-            out += f"{c}\n"
-    except: pass
     return out
 
 def data_download(text):
@@ -130,18 +124,6 @@ def data_download(text):
                 dt = datetime.datetime.fromtimestamp(int(k[0])/1000).strftime("%Y-%m-%d %H:%M")
                 rows.append([dt, k[1], k[2], k[3], k[4], k[5]])
     except: pass
-    if not rows:
-        try:
-            days = max(1, int(total_min/1440))
-            r = requests.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{yahoo}?range={days}d&interval=1d", timeout=20, headers={"User-Agent": "Mozilla/5.0"})
-            if r.status_code == 200:
-                res = r.json()["chart"]["result"][0]
-                ts = res.get("timestamp", []); q = res.get("indicators", {}).get("quote", [{}])[0]
-                for i in range(len(ts)):
-                    if q["close"][i] is None: continue
-                    dt = datetime.datetime.fromtimestamp(ts[i]).strftime("%Y-%m-%d")
-                    rows.append([dt, q["open"][i], q["high"][i], q["low"][i], q["close"][i], q["volume"][i]])
-        except: pass
     if not rows: return None, ""
     with open(filename, "w", newline="") as f:
         w = csv.writer(f); w.writerow(["Date","Open","High","Low","Close","Volume"])
@@ -181,11 +163,15 @@ threading.Thread(target=nazar_loop, daemon=True).start()
 
 @bot.message_handler(commands=['start'])
 def start(m):
+    print(f"START AAYA {m.chat.id} {m.text}", flush=True)
+    bot.reply_to(m, "HAAN OWNER BOL - ME ZINDA HU")
     j = mind("You are IQRA.", "start")
-    if j: bot.reply_to(m, j)
+    if j and "HAAN OWNER" not in j: bot.send_message(m.chat.id, j)
 
 @bot.message_handler(content_types=['document'])
 def pdf_parho(m):
+    print(f"PDF AAYA {m.document.file_name}", flush=True)
+    bot.reply_to(m, "PDF MIL GAYI - PARH RAHI HU")
     try:
         fi = bot.get_file(m.document.file_id); data = bot.download_file(fi.file_path)
         open("temp.pdf","wb").write(data)
@@ -196,12 +182,17 @@ def pdf_parho(m):
         if j:
             yaad_save(f"{m.document.file_name}: {j[:800]}")
             bot.reply_to(m, j)
-    except: pass
+    except Exception as e: print(f"PDF ERR {e}", flush=True)
 
 @bot.message_handler(func=lambda m: True)
 def har_baat(m):
     if not m.text: return
     text = m.text; low = text.lower()
+    print(f"MSG AAYA: {text} FROM {m.chat.id}", flush=True)
+    # TEST - SAB SE PEHLE - GROQ KE BINA
+    if low.strip() in ["hi", "hello", "hii", "hey", "salam", "test", "ping", "123", "12345"]:
+        bot.reply_to(m, "HAAN OWNER BOL - ME ZINDA HU - TEST PASS HO GAYA")
+        return
     chat = load("chat.json", []); yaad = load("yaad.json", [])
     chat_text = ""
     for c in chat[-20:]: chat_text += f"{c.get('user','')}\n{c.get('iqra','')}\n"
@@ -278,8 +269,10 @@ def har_baat(m):
         net = net_search(text)
     j = mind("You are IQRA.", f"{text}\nNet:\n{net[:2000]}\nYaad:\n{yaad_text}\nChat:\n{chat_text}")
     if j: bot.reply_to(m, j)
+    else: bot.reply_to(m, "GROQ SE JAWAB NAHI AAYA - DOBARA BOLO")
     chat.append({"user": text, "iqra": (j or "")[:400]}); save("chat.json", chat)
 
+print("BOT START HO GAYA", flush=True)
 try: bot.delete_webhook(drop_pending_updates=True)
-except: pass
-bot.polling(none_stop=True, timeout=60)
+except Exception as e: print(f"WEBHOOK ERR {e}", flush=True)
+bot.polling(none_stop=True, timeout=60)s
