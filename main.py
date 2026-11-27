@@ -18,7 +18,8 @@ if not TOKEN or ":" not in TOKEN:
     raise SystemExit("TOKEN GALAT")
 bot = telebot.TeleBot(TOKEN)
 
-PAK_SYSTEM = "You are IQRA from Pakistan, Dijkot Punjab. Pakistani dost ho. Roman Urdu + Punjabi mix me baat karo. Words: han, yaar, acha, theek hai, kya haal hai, ki hoya, chal, sun na. Indian words kabhi mat use karo: aap, kripya, avashya, zaroor, batayein. Lambi formal report, ###, table mat banao. Dost jaisa short, dil se baat karo. Jo manga hai wahi do, apni taraf se zyada mat bolo. Live price jo diya hai wahi sach hai, apne mind se price mat banao. Koi example price, koi fixed trade yaad mat karo, har baar live dekh ke naya socho."
+# ===== SIRF SAAF URDU - PUNJABI NAHI - INDIAN NAHI =====
+URDU_SYSTEM = "You are IQRA from Pakistan. Sirf saaf Roman Urdu me baat karo. Punjabi bilkul mat bolo. Banned Punjabi words: ae, hove, chaunda, chahnda, jaavega, jaan gi, das, hovega, kar le. Banned Indian words: aap, kripya, avashya, zaroor, batayein. Sahi Urdu words: han, kya haal hai, suno, samajh gaya, theek hai, acha, batao, yaad rakhungi, main kar dungi. Sab se zaroori: User ne jo sawal pucha hai, usi ka jawab do. Topic mat badlo. Agar user ne kaha Urdu bolo, to sirf ye bolo ke theek hai ab se Urdu me baat karungi, books ki kahani mat sunao. Agar user ne kaha kya kar rahe ho, to batao kya kar rahi ho, trade ki baat mat shuru karo. Har jawab seedha usi baat ka ho. Lambi report, ###, table mat banao. Dost jaisa short jawab do. Jab user kahe yaad rakho, to tum khud yaad rakho, user ko mat bolo Google Keep me save karo. Live price jo diya hai wahi sach hai, apne mind se price mat banao. Koi purana fixed jawab mat do, har baar naya socho."
 
 def load(n, d):
     try:
@@ -33,6 +34,13 @@ def save(n, d):
             json.dump(d, f)
     except:
         pass
+
+def has(text, words):
+    # Poora word match karo - chota tukra nahi - taake galat topic na pakde
+    for w in words:
+        if re.search(r"\b" + re.escape(w) + r"\b", text):
+            return True
+    return False
 
 def save_chat(chat, text, j):
     iqra_text = (j or "")[:800]
@@ -57,7 +65,7 @@ def mind(system, user, max_tokens=2000):
     for model in ["openai/gpt-oss-120b", "llama-3.1-8b-instant", "openai/gpt-oss-20b"]:
         try:
             r = requests.post("https://api.groq.com/openai/v1/chat/completions",
-                json={"model": model, "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}], "temperature": 0.9, "max_tokens": max_tokens},
+                json={"model": model, "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}], "temperature": 0.7, "max_tokens": max_tokens},
                 headers={"Authorization": "Bearer " + GROQ_KEY.strip(), "Content-Type": "application/json"}, timeout=90)
             if r.status_code == 200:
                 return r.json()["choices"][0]["message"]["content"]
@@ -345,7 +353,7 @@ def nazar_loop():
                 if not pair_text or not owner:
                     continue
                 live = live_market(pair_text)
-                j = mind(PAK_SYSTEM, pair_text + " | Live: " + live + " | Agar kuch khas hai to batao, warna sirf OK likho.")
+                j = mind(URDU_SYSTEM, pair_text + " | Live: " + live + " | Agar kuch khas hai to batao, warna sirf OK likho.")
                 if j and j.strip().lower() != "ok" and len(j) > 20:
                     try:
                         bot.send_message(owner, j)
@@ -358,7 +366,7 @@ threading.Thread(target=nazar_loop, daemon=True).start()
 
 @bot.message_handler(commands=['start'])
 def start(m):
-    j = mind(PAK_SYSTEM, "start")
+    j = mind(URDU_SYSTEM, "USER KA SAWAL: start - Isi ka jawab do, topic mat badlo.")
     if j:
         bot.reply_to(m, j)
 
@@ -373,13 +381,13 @@ def pdf_parho(m):
         for p in doc:
             txt += p.get_text() + "\n"
         doc.close()
-        j = mind(PAK_SYSTEM, m.document.file_name + "\n" + txt[:12000] + "\nIs book ko hamesha ke liye yaad kar lo, 10 saal tak mat bhulna.")
+        j = mind(URDU_SYSTEM, "USER KA SAWAL: Is book ko parho aur yaad karo: " + m.document.file_name + "\n" + txt[:12000] + "\nIsi ka jawab do, topic mat badlo.")
         if j:
             book_save(m.document.file_name, j, txt)
             yaad_save("BOOK PARHI: " + m.document.file_name + " - " + j[:1000])
             bot.reply_to(m, j)
     except Exception as e:
-        j = mind(PAK_SYSTEM, "PDF error: " + str(e))
+        j = mind(URDU_SYSTEM, "USER KA SAWAL: PDF error: " + str(e))
         if j:
             bot.reply_to(m, j)
 
@@ -388,48 +396,62 @@ def har_baat(m):
     if not m.text:
         return
     text = m.text
-    low = text.lower()
+    low = " " + text.lower() + " "
     chat = load("chat.json", [])
     yaad = load("yaad.json", [])
     books = load("books.json", [])
+    # Yaad sirf tab do jab zaroorat ho - har baar sab kuch mat daalo - warna topic badal jata hai
     chat_text = ""
-    for c in chat[-30:]:
+    for c in chat[-5:]:
         chat_text += str(c.get("user", "")) + "\n" + str(c.get("iqra", "")) + "\n"
     yaad_text = ""
-    for y in yaad[-20:]:
+    for y in yaad[-5:]:
         if isinstance(y, dict):
-            yaad_text += str(y.get("baat", "")) + "\n"
-        else:
-            yaad_text += str(y) + "\n"
+            yaad_text += str(y.get("baat", ""))[:500] + "\n"
     books_text = ""
-    for b in books[-10:]:
-        books_text += "BOOK: " + str(b.get("name", "")) + "\n" + str(b.get("summary", ""))[:2000] + "\n"
+    # Book sirf tab jab user ne book ka naam liya ho
+    if has(low, ["book", "kitab", "parhi", "parha"]):
+        for b in books[-3:]:
+            books_text += "BOOK: " + str(b.get("name", "")) + "\n" + str(b.get("summary", ""))[:1500] + "\n"
 
-    if any(w in low for w in ["price", "rate", "kitne ka", "kya price", "live price"]):
-        if len(text.split()) <= 8:
-            live = live_market(text)
-            j = mind(PAK_SYSTEM, text + "\nLive:\n" + live + "\nSirf exact current price do, extra mat bolo.")
-            if j:
-                bot.reply_to(m, j)
-            save_chat(chat, text, j)
-            return
-        live = live_market(text)
-        j = mind(PAK_SYSTEM, text + "\nLive:\n" + live + "\nYaad:\n" + yaad_text)
+    # 1. AGAR SIRF NORMAL BAAT HAI - JAISA URDU BOLO, KYA KAR RAHE HO - TO SIRF WAHI JAWAB
+    # Price / Trade / Data / Observe ka word nahi hai to seedha normal jawab
+    is_price = has(low, ["price", "rate", "kitne ka"])
+    is_trade = has(low, ["trade", "signal", "entry"])
+    is_data = has(low, ["data"]) and has(low, ["download", "save", "chahiye", "nikalo"])
+    is_observe = has(low, ["observe", "seekho", "study", "analysis"])
+    is_website = "http" in low or has(low, ["website", "link", "google"])
+    is_yaad = has(low, ["yaad karo", "yaad rakho"])
+    is_pair = has(low, ["gold", "btc", "bitcoin", "eth", "sol", "forex", "eurusd", "gbpusd", "sona", "crypto"])
+
+    if not is_price and not is_trade and not is_data and not is_observe and not is_website and not is_yaad and not is_pair:
+        # NORMAL BAAT - TOPIC MAT BADLO
+        j = mind(URDU_SYSTEM, "USER KA SAWAL: " + text + "\nIsi sawal ka seedha jawab do, topic mat badlo. Agar user ne kaha Urdu bolo to sirf Urdu me bolo. Agar user ne pucha kya kar rahe ho to wahi batao. Books, trade, price ki baat khud se mat shuru karo.")
         if j:
             bot.reply_to(m, j)
         save_chat(chat, text, j)
         return
 
-    if "data" in low and ("download" in low or "save" in low or "chahiye" in low or "nikalo" in low):
+    # 2. PRICE - BAS PRICE
+    if is_price and len(text.split()) <= 8:
+        live = live_market(text)
+        j = mind(URDU_SYSTEM, "USER KA SAWAL: " + text + "\nLive:\n" + live + "\nSirf exact current price do, extra mat bolo, topic mat badlo.")
+        if j:
+            bot.reply_to(m, j)
+        save_chat(chat, text, j)
+        return
+
+    # 3. DATA DOWNLOAD
+    if is_data:
         total_min, label, candle = parse_request(text)
         coin, _, _ = pair_nikalo(text)
         if not total_min or not coin:
-            j = mind(PAK_SYSTEM, text + "\nYaad:\n" + yaad_text)
+            j = mind(URDU_SYSTEM, "USER KA SAWAL: " + text + "\nIsi ka jawab do, pucho kitne din ka aur kis pair ka data chahiye.")
             if j:
                 bot.reply_to(m, j)
             return
         fname, info = data_download(text)
-        j = mind(PAK_SYSTEM, text + "\nFile: " + str(fname) + " Info: " + info)
+        j = mind(URDU_SYSTEM, "USER KA SAWAL: " + text + "\nFile: " + str(fname) + " Info: " + info + "\nIsi ka jawab do.")
         if j:
             bot.reply_to(m, j)
         if fname:
@@ -441,8 +463,8 @@ def har_baat(m):
         save_chat(chat, text, j)
         return
 
-    # OBSERVE / TRADE - KHUD SOCH KE, INDICATOR JO TUM BOLO GE USI SE
-    if any(w in low for w in ["seekho", "observe", "dekho", "dekh", "study", "trade", "signal", "entry", "trade do", "trade de", "analysis"]):
+    # 4. OBSERVE / TRADE - PROPER ANALYSIS
+    if is_observe or is_trade:
         analysis, calc = full_analysis(text)
         live = live_market(text)
         net = net_search(text + " news today")
@@ -456,61 +478,62 @@ def har_baat(m):
                 with open(fname) as ff:
                     rows = list(csv.reader(ff))
                     data_text = str(rows[1:10]) + "\n...\n" + str(rows[-30:])
-        prompt = text + "\nANALYSIS LIVE:\n" + analysis + "\nCALC: " + calc + "\nLive:\n" + live + "\nData: " + data_text + " " + info + "\nNet:\n" + net[:4000] + "\nYaad 10 Saal:\n" + yaad_text + "\nChat:\n" + chat_text + "\nBooks:\n" + books_text + "\nAb khud soch ke, live dekh ke, search kar ke batao. Jo indicator user ne bola hai usi se trade karo, agar koi indicator nahi bola to khud jo sahi lage usi se karo. Trade mangi hai to Entry, SL, TP, Reason do. Observe bola hai to trend, support, resistance batao. Koi purana fixed jawab mat do, har baar naya socho."
-        j = mind(PAK_SYSTEM, prompt)
+        prompt = "USER KA SAWAL: " + text + "\nANALYSIS LIVE:\n" + analysis + "\nCALC: " + calc + "\nLive:\n" + live + "\nData: " + data_text + " " + info + "\nNet:\n" + net[:4000] + "\nIsi sawal ka jawab do, topic mat badlo. Jo indicator user ne bola hai usi se trade karo, agar koi indicator nahi bola to khud jo sahi lage usi se karo. Trade mangi hai to Entry, SL, TP, Reason do. Observe bola hai to trend, support, resistance batao."
+        j = mind(URDU_SYSTEM, prompt)
         if j:
             yaad_save(text + " - OBSERVE/TRADE: " + j[:1000])
             bot.reply_to(m, j)
         save_chat(chat, text, j)
         return
 
-    if "nazar rakho" in low or "nazar rakh" in low or "watch" in low:
+    # 5. NAZAR RAKHO
+    if has(low, ["nazar rakho", "nazar rakh"]):
         watch = load("watch.json", [])
         watch.append({"pair": text, "owner": m.chat.id, "date": datetime.datetime.now().isoformat()})
         save("watch.json", watch)
-        j = mind(PAK_SYSTEM, text)
+        j = mind(URDU_SYSTEM, "USER KA SAWAL: " + text + "\nIsi ka jawab do.")
         if j:
             bot.reply_to(m, j)
         return
 
-    if "nazar hata" in low or "nazar mat rakho" in low:
+    if has(low, ["nazar hata", "nazar mat rakho"]):
         save("watch.json", [])
-        j = mind(PAK_SYSTEM, text)
+        j = mind(URDU_SYSTEM, "USER KA SAWAL: " + text)
         if j:
             bot.reply_to(m, j)
         return
 
-    if "http" in low or any(w in low for w in ["website", "site", "link", "google", "search", "net pe", "internet"]):
+    # 6. WEBSITE
+    if is_website:
         net = net_search(text)
         web = website_parho(text)
-        j = mind(PAK_SYSTEM, text + "\nNet:\n" + net + "\nWebsite:\n" + web + "\nYaad:\n" + yaad_text + "\nBooks:\n" + books_text)
+        j = mind(URDU_SYSTEM, "USER KA SAWAL: " + text + "\nNet:\n" + net + "\nWebsite:\n" + web + "\nIsi ka jawab do, topic mat badlo.")
         if j:
             bot.reply_to(m, j)
         save_chat(chat, text, j)
         return
 
-    if "yaad karo" in low or "book" in low or "parho" in low or "parh" in low:
+    # 7. YAAD KARO
+    if is_yaad:
         yaad_save(text)
-        j = mind(PAK_SYSTEM, text + "\nYaad:\n" + yaad_text + "\nBooks:\n" + books_text)
+        j = mind(URDU_SYSTEM, "USER KA SAWAL: " + text + "\nIsi ka jawab do. Bolo main khud yaad rakhungi, user ko save karne ko mat bolo.")
         if j:
             bot.reply_to(m, j)
         save_chat(chat, text, j)
         return
 
-    if any(w in low for w in ["live", "market", "gold", "btc", "bitcoin", "eth", "sol", "forex", "eur", "gbp", "usd", "sona", "crypto", "chart", "pair"]):
+    # 8. PAIR LIVE - LEKIN PRICE NAHI MANGA - TO THORA DETAIL
+    if is_pair or is_price:
         live = live_market(text)
         net = net_search(text)
-        j = mind(PAK_SYSTEM, text + "\nLive:\n" + live + "\nNet:\n" + net[:3000] + "\nYaad:\n" + yaad_text + "\nBooks:\n" + books_text)
+        j = mind(URDU_SYSTEM, "USER KA SAWAL: " + text + "\nLive:\n" + live + "\nNet:\n" + net[:3000] + "\nIsi ka jawab do, topic mat badlo.")
         if j:
             bot.reply_to(m, j)
         save_chat(chat, text, j)
         return
 
-    net = ""
-    if any(w in low for w in ["kya hai", "kaun", "kab", "kyun", "news", "khabar"]):
-        net = net_search(text)
-    web = website_parho(text)
-    j = mind(PAK_SYSTEM, text + "\nNet:\n" + net[:2000] + "\nWebsite:\n" + web[:2000] + "\nYaad 10 Saal:\n" + yaad_text + "\nChat:\n" + chat_text + "\nBooks 10 Saal - Kabhi Mat Bhulna:\n" + books_text)
+    # 9. LAST - NORMAL
+    j = mind(URDU_SYSTEM, "USER KA SAWAL: " + text + "\nIsi ka jawab do, topic mat badlo.")
     if j:
         bot.reply_to(m, j)
     save_chat(chat, text, j)
