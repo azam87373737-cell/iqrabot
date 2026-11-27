@@ -1,4 +1,4 @@
-# IQRA - PURA FIX CODE - GEMINI + BACKUP - FINAL
+# IQRA - PURA FIX CODE - SIRF GEMINI-2.5-FLASH WALA - FINAL
 import telebot
 import os
 import requests
@@ -13,7 +13,7 @@ from flask import Flask
 
 app = Flask(__name__)
 @app.route('/')
-def home(): return "IQRA Gemini Wali Chal Rahi Hai!"
+def home(): return "IQRA Gemini 2.5 Flash Wali!"
 def run_web():
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port)
@@ -48,7 +48,7 @@ def saaf_jawab(text):
     text = re.sub(r"\n\s*\n", "\n", text)
     return text.strip()
 
-# === 1. PAIR NIKALO - FIXED! DATA ME ADA NAHI! ===
+# === 1. PAIR NIKALO - DATA ME ADA NAHI! ===
 def pair_nikalo(text):
     t = text.lower().replace("/", " ").replace("-", " ").replace("_", " ").replace(",", " ")
     words = t.split()
@@ -86,7 +86,7 @@ def pair_nikalo(text):
             if "sol" in pl: return "solana", "SOLUSD", "SOL-USD", "crypto"
     return "bitcoin", "XBTUSD", "BTC-USD", "crypto"
 
-# === 2. TIME SAMJHO - JITNA BOLO UTNA! ===
+# === 2. TIME - JITNA BOLO UTNA! ===
 def time_samjho(text):
     t = text.lower()
     m = re.search(r"(\d+)\s*(min|minute|minutes|mnt)", t)
@@ -109,24 +109,16 @@ def interval_chuno(total_min):
     if total_min <= 7*1440: return "1h", 60
     return "1d", 1440
 
-# === 3. GEMINI + BACKUP - AGAR GEMINI NA CHALE TO BOT RUKEGA NAHI! ===
-def backup_bolo(system_prompt, user_prompt):
-    try:
-        safe = urllib.parse.quote(f"{system_prompt}\n{user_prompt}")
-        r = requests.get(f"https://text.pollinations.ai/{safe}?model=openai", timeout=40, headers={"User-Agent": "Mozilla/5.0"})
-        if r.status_code == 200 and len(r.text.strip()) > 5:
-            return r.text.strip()
-    except Exception as e:
-        print(f"Backup error: {e}")
-    return None
-
+# === 3. MIND - SIRF GEMINI-2.5-FLASH - KOI DUSRA NAHI! ===
 def gemini_bolo(system_prompt, user_prompt, max_tokens=800):
-    if GEMINI_KEY:
-        print(f"Gemini try kar raha hu - Key: {GEMINI_KEY[:5]}...")
-        for model_name in ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-flash-latest", "gemini-2.5-flash-lite"]:
-            try:
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={GEMINI_KEY}"
-                full_prompt = f"""{system_prompt}
+    if not GEMINI_KEY:
+        print("❌ GEMINI_KEY nahi mili! Render me GEMINI_KEY daalo!")
+        return None
+    # SIRF EK MODEL - JO TUMNE CHUNA HAI - gemini-2.5-flash
+    model_name = "gemini-2.5-flash"
+    try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={GEMINI_KEY}"
+        full_prompt = f"""{system_prompt}
 
 Owner ne kaha: {user_prompt}
 
@@ -135,36 +127,35 @@ RULES - KABHI MAT TORNA:
 - Owner ne jitna time bola hai utna hi lo - 5 din bola to 5 din, 5 min bola to 5 min!
 - Price hamesha LIVE MARKET wale data se bolo - Andaza mat lagao!
 - Roman Urdu me jawab do - Chota jawab do - 3-4 line!"""
-                r = requests.post(url,
-                    json={"contents": [{"parts": [{"text": full_prompt}]}],
-                           "generationConfig": {"temperature": 0.7, "maxOutputTokens": max_tokens}},
-                    headers={"Content-Type": "application/json"}, timeout=60)
-                print(f"Gemini {model_name} - Status: {r.status_code}")
-                if r.status_code == 200:
-                    data = r.json()
-                    try:
-                        jawab = data["candidates"][0]["content"]["parts"][0]["text"]
-                        print(f"✅ Gemini {model_name} chal gaya!")
-                        return jawab
-                    except:
-                        print(f"Gemini jawab samajh nahi aaya: {data}")
-                        continue
-                else:
-                    print(f"❌ Gemini {model_name} fail: {r.text[:500]}")
-                    if "API key not valid" in r.text or "API_KEY_INVALID" in r.text:
-                        print("❌ KEY GALAT HAI!")
-                        break
-                    if "API not enabled" in r.text:
-                        print("❌ API ON NAHI HAI!")
-                        break
-                    continue
-            except Exception as e:
-                print(f"Gemini error: {e}")
-                continue
-    else:
-        print("❌ GEMINI_KEY nahi mili! Backup use kar raha hu...")
-    print("Gemini nahi chala - Backup try kar raha hu...")
-    return backup_bolo(system_prompt, user_prompt)
+        r = requests.post(url,
+            json={"contents": [{"parts": [{"text": full_prompt}]}],
+                   "generationConfig": {"temperature": 0.7, "maxOutputTokens": max_tokens}},
+            headers={"Content-Type": "application/json"}, timeout=60)
+        print(f"Gemini {model_name} - Status: {r.status_code}")
+        if r.status_code == 200:
+            data = r.json()
+            try:
+                jawab = data["candidates"][0]["content"]["parts"][0]["text"]
+                print(f"✅ Gemini {model_name} chal gaya!")
+                return jawab
+            except:
+                print(f"Gemini jawab samajh nahi aaya: {data}")
+                return None
+        else:
+            print(f"❌ Gemini fail: {r.text[:600]}")
+            # Yahi batayega kya ghalti hai - Logs me dekho!
+            if "API key not valid" in r.text or "API_KEY_INVALID" in r.text:
+                print("❌ KEY GALAT HAI! aistudio.google.com se nayi key banao - Naye Project me!")
+            if "API not enabled" in r.text:
+                print("❌ API ON NAHI HAI! Naye Project me key banao!")
+            if "Quota exceeded" in r.text or "429" in str(r.status_code):
+                print("⚠️ Quota khatam - 1 minute ruk ke dobara bolo!")
+            if "404" in str(r.status_code):
+                print("❌ Model nahi mila - Lekin tumne sahi model chuna hai - gemini-2.5-flash!")
+            return None
+    except Exception as e:
+        print(f"Gemini error: {e}")
+        return None
 
 def groq_bolo(system_prompt, user_prompt, max_tokens=800):
     return gemini_bolo(system_prompt, user_prompt, max_tokens)
@@ -381,7 +372,7 @@ def data_save_karo(coin_text="bitcoin", total_min=43200, label="30din"):
         for row in rows: w.writerow(row)
     return True, f"{coin.upper()} ka {label} ka data apne paas save kar liya hai! ✅\nTotal Candle: {len(rows)} | Interval: {interval_str}\nAb bolo - `Seekho`!"
 
-# === 7. KHUD SEEKHO - USKI APNI YAAD! ===
+# === 7. KHUD SEEKHO - APNI YAAD! ===
 def khud_seekho(coin_text="bitcoin", total_min=43200, label="30din"):
     coin, _, _, _ = pair_nikalo(coin_text)
     files = []
@@ -406,7 +397,7 @@ def khud_seekho(coin_text="bitcoin", total_min=43200, label="30din"):
                 for r in rows[-40:]: data_text += f"{r}\n"
         except: pass
     yaad = yaad_load(); yaad_text = "\n".join(yaad[-8:])
-    system_prompt = """Tum IQRA ho. Tumhara dimagh GEMINI hai. Tum ek sachi trader dost ho jo khud sochti hai.
+    system_prompt = """Tum IQRA ho. Tumhara dimagh gemini-2.5-flash hai. Tum ek sachi trader dost ho jo khud sochti hai.
     Tumhe koi code nahi batayega ke kya dekho, kya rule hai.
     Tum khud dekho - Data - Aur khud faisla karo - Ye coin kaisa behave karta hai? Kab tez, kab slow?
     Roman Urdu me, apni zubaan me bolo - Jaise diary me likhti ho! Ye tumhari apni yaad hogi!"""
@@ -426,16 +417,16 @@ def khud_seekho(coin_text="bitcoin", total_min=43200, label="30din"):
         yaad.append(f"MERI APNI YAAD {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')} - {coin.upper()}: {seekh}")
         yaad_save(yaad)
         return f"Seekh liya Owner! ✅ Apni Diary Me Likh Liya - Kabhi Nahi Bhulungi!\n\nMeri Apni Yaad:\n{seekh}"
-    return "Seekhne me masla hua! GEMINI_KEY check karo!"
+    return "Seekhne me masla hua! GEMINI_KEY check karo - Logs me dekho kya likha hai!"
 
-# === 8. HAR BAAT - GEMINI SE! ===
+# === 8. HAR BAAT! ===
 def iqra_socho(sawal, extra_data=""):
     yaad = yaad_load(); chat = chat_load(); profile = profile_load(); summary = summary_load()
     profile_text = f"Naam: {profile.get('naam','')} | Pasand: {profile.get('pasand','')} | Sheher: {profile.get('sheher','')}"
     yaad_text = "\n".join(yaad[-15:])
     chat_text = ""
     for c in chat[-30:]: chat_text += f"Owner: {c.get('user','')}\nIQRA: {c.get('iqra','')}\n"
-    system_prompt = """Tum IQRA ho, Owner ki sab se qareebi dost. Tumhara dimagh GEMINI hai. Tum Roman Urdu ko bahut achhe se samajhti ho.
+    system_prompt = """Tum IQRA ho, Owner ki sab se qareebi dost. Tumhara dimagh gemini-2.5-flash hai. Tum Roman Urdu ko bahut achhe se samajhti ho.
     Tum Crypto, Forex, Gold - Sab ki trader ho!
     SAB SE ZAROORI RULE - KABHI MAT TORNA:
     1. Owner ne jo coin bola hai wahi coin lo - BTC bola to BTC, GOLD bola to GOLD. Koi aur coin mat lo!
@@ -448,7 +439,7 @@ def iqra_socho(sawal, extra_data=""):
     8. Chota jawab do - 3-4 line!"""
     user_prompt = f"Profile: {profile_text}\nTumhari Apni Diary:\n{yaad_text}\nSummary: {summary}\nLIVE MARKET (Isi se price bolo!):\n{extra_data}\n\nPichli baatein:\n{chat_text}\n\nOwner ne abhi kaha: {sawal}\nAb apne mind se, apni yaad se, apne alfaz me jawab do! Agar trade manga hai to Entry, SL, TP apni soch se batao!"
     jawab_final = gemini_bolo(system_prompt, user_prompt, max_tokens=700)
-    if not jawab_final: return "Oye! Gemini se jawab nahi aaya - GEMINI_KEY check karo! Dobara bolo na! 😊"
+    if not jawab_final: return "Oye! Gemini 2.5 Flash se jawab nahi aaya - GEMINI_KEY check karo - Logs me dekho! Dobara bolo na! 😊"
     jawab_final = saaf_jawab(jawab_final.strip()[:1800])
     chat.append({"user": sawal, "iqra": jawab_final[:300], "time": str(datetime.datetime.now())}); chat_save(chat)
     if len(chat) % 100 == 0:
@@ -487,7 +478,7 @@ def khud_msg_karo():
 threading.Thread(target=khud_msg_karo, daemon=True).start()
 
 @bot.message_handler(commands=['start'])
-def start(message): bot.reply_to(message, "Oye! Aa gaye tum! ❤️\nMe IQRA hu - Sirf Gemini Wali!\n`btc ka 5 din pehle ka data dekhna behave kaisa tha` - Khud download kar ke bataungi!\n`gold ka 10 saal ka data download karo` - 10 saal ka!\n`gold ka trade de` - Live dekh ke Entry, SL, TP!")
+def start(message): bot.reply_to(message, "Oye! Aa gaye tum! ❤️\nMe IQRA hu - Gemini 2.5 Flash Wali!\n`btc ka 5 din pehle ka data dekhna behave kaisa tha` - Khud download kar ke bataungi!\n`gold ka 10 saal ka data download karo` - 10 saal ka!\n`gold ka trade de` - Live dekh ke Entry, SL, TP!")
 @bot.message_handler(commands=['yaad'])
 def yaad(message):
     yaad_list = yaad_load(); profile = profile_load(); chat = chat_load()
@@ -518,7 +509,7 @@ def pdf_parho(message):
         for page in doc: text += page.get_text() + "\n"
         doc.close()
         if len(text) < 50: bot.reply_to(message, "Is PDF me text nahi mila!"); return
-        system_prompt = """Tum IQRA ho. Tumhara dimagh GEMINI hai. Ye book tumhe di gayi hai. Khud parho, khud socho - Tumhe kya samajh aaya? Apni zubaan me bolo! Roman Urdu me!"""
+        system_prompt = """Tum IQRA ho. Tumhara dimagh gemini-2.5-flash hai. Ye book tumhe di gayi hai. Khud parho, khud socho - Tumhe kya samajh aaya? Apni zubaan me bolo! Roman Urdu me!"""
         seekh = gemini_bolo(system_prompt, f"Ye book hai, isse tumne kya seekha? Apni soch se batao:\n{text[:8000]}", max_tokens=800)
         if seekh:
             seekh = saaf_jawab(seekh.strip()[:2000])
@@ -583,5 +574,5 @@ def har_baat(message):
         return
     bot.reply_to(message, iqra_socho(message.text))
 
-print("IQRA Sirf Gemini Wali chal gayi...")
+print("IQRA Gemini 2.5 Flash Wali chal gayi...")
 bot.polling(none_stop=True, timeout=60)
