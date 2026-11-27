@@ -7,9 +7,17 @@ def run_web(): app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 10000)))
 threading.Thread(target=run_web, daemon=True).start()
 try: import fitz
 except: fitz = None
-TOKEN = os.environ.get("BOT_TOKEN")
-GROQ_KEY = os.environ.get("GROQ_KEY")
+
+# ===== FIX - TOKEN ME SPACE HO TO KHUD SAAF HO JAYE =====
+TOKEN = os.environ.get("BOT_TOKEN", "").strip().replace(" ", "").replace("\n", "").replace("\r", "").replace('"', "").replace("'", "")
+GROQ_KEY = os.environ.get("GROQ_KEY", "").strip().replace(" ", "").replace("\n", "").replace("\r", "").replace('"', "").replace("'", "")
+print(f"TOKEN LEN: {len(TOKEN)} SPACE: {' ' in TOKEN}")
+print(f"GROQ LEN: {len(GROQ_KEY)}")
+if not TOKEN or " " in TOKEN or ":" not in TOKEN:
+    print("TOKEN GALAT HAI - RENDER ME SAHI KARO")
+    raise SystemExit("TOKEN GALAT")
 bot = telebot.TeleBot(TOKEN)
+
 def load(n, d):
     try:
         with open(n) as f: return json.load(f)
@@ -19,7 +27,6 @@ def save(n, d):
         with open(n, "w") as f: json.dump(d, f)
     except: pass
 
-# ===== MIND - GROQ =====
 def mind(system, user, max_tokens=1000):
     if not GROQ_KEY: return None
     for model in ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"]:
@@ -202,7 +209,6 @@ def har_baat(m):
     for y in yaad[-12:]:
         if isinstance(y, dict): yaad_text += f"{y.get('baat','')}\n"
         else: yaad_text += f"{y}\n"
-
     if "data" in low and ("download" in low or "save" in low or "chahiye" in low):
         total_min, label = time_nikalo(text); coin, _, _ = pair_nikalo(text)
         if not total_min or not coin:
@@ -214,7 +220,6 @@ def har_baat(m):
         if j: bot.reply_to(m, j)
         chat.append({"user": text, "iqra": (j or "")[:400]}); save("chat.json", chat)
         return
-
     if any(w in low for w in ["seekho", "observe", "dekho", "dekh", "kaisa", "kesa"]):
         total_min, label = time_nikalo(text); coin, _, _ = pair_nikalo(text)
         if not total_min or not coin:
@@ -234,14 +239,12 @@ def har_baat(m):
             bot.reply_to(m, j)
         chat.append({"user": text, "iqra": (j or "")[:400]}); save("chat.json", chat)
         return
-
     if any(w in low for w in ["trade", "signal", "entry"]):
         live = live_market(text); net = net_search(text)
         j = mind("You are IQRA.", f"{text}\nLive:\n{live}\nNet:\n{net[:2000]}\nYaad:\n{yaad_text}\nChat:\n{chat_text}")
         if j: bot.reply_to(m, j)
         chat.append({"user": text, "iqra": (j or "")[:400]}); save("chat.json", chat)
         return
-
     if "nazar rakho" in low or "nazar rakh" in low or "watch" in low:
         watch = load("watch.json", [])
         watch.append({"pair": text, "owner": m.chat.id, "date": datetime.datetime.now().isoformat()})
@@ -249,32 +252,27 @@ def har_baat(m):
         j = mind("You are IQRA.", f"{text}")
         if j: bot.reply_to(m, j)
         return
-
     if "nazar hata" in low or "nazar mat rakho" in low:
         save("watch.json", [])
         j = mind("You are IQRA.", f"{text}")
         if j: bot.reply_to(m, j)
         return
-
     if "http" in low or any(w in low for w in ["website", "site", "link", "google", "search", "net pe", "internet"]):
         net = net_search(text)
         j = mind("You are IQRA.", f"{text}\nNet:\n{net}\nYaad:\n{yaad_text}")
         if j: bot.reply_to(m, j)
         return
-
     if "yaad karo" in low:
         yaad_save(text)
         j = mind("You are IQRA.", f"{text}")
         if j: bot.reply_to(m, j)
         return
-
     if any(w in low for w in ["price", "rate", "live", "market", "gold", "btc", "bitcoin", "eth", "sol", "forex", "eur", "gbp", "usd", "sona", "crypto", "chart"]):
         live = live_market(text); net = net_search(text)
         j = mind("You are IQRA.", f"{text}\nLive:\n{live}\nNet:\n{net[:2000]}\nYaad:\n{yaad_text}\nChat:\n{chat_text}")
         if j: bot.reply_to(m, j)
         chat.append({"user": text, "iqra": (j or "")[:400]}); save("chat.json", chat)
         return
-
     net = ""
     if any(w in low for w in ["kya hai", "kaun", "kab", "kyun", "kaisa", "news", "khabar"]):
         net = net_search(text)
